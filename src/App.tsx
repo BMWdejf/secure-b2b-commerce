@@ -15,7 +15,13 @@ import RegisterDone from "./pages/RegisterDone";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import AccountHome from "./pages/account/AccountHome";
-import AdminHome from "./pages/admin/AdminHome";
+import AdminLayout from "@/components/layout/AdminLayout";
+import AdminDashboard from "./pages/admin/AdminDashboard";
+import AdminProducts from "./pages/admin/AdminProducts";
+import AdminProductForm from "./pages/admin/AdminProductForm";
+import AdminCategories from "./pages/admin/AdminCategories";
+import AdminClients from "./pages/admin/AdminClients";
+import AdminPricelists from "./pages/admin/AdminPricelists";
 import Placeholder from "./pages/Placeholder";
 import NotFound from "./pages/NotFound";
 
@@ -91,18 +97,21 @@ const App = () => (
                 path="/admin"
                 element={
                   <ProtectedRoute requireAdmin>
-                    <AdminHome />
+                    <AdminLayout />
                   </ProtectedRoute>
                 }
-              />
-              <Route
-                path="/admin/:section"
-                element={
-                  <ProtectedRoute requireAdmin>
-                    <Placeholder title="Admin sekce" description="Bude doplněno v dalších fázích." />
-                  </ProtectedRoute>
-                }
-              />
+              >
+                <Route index element={<AdminDashboard />} />
+                <Route path="produkty" element={<AdminProducts />} />
+                <Route path="produkty/novy" element={<AdminProductForm />} />
+                <Route path="produkty/:id" element={<AdminProductForm />} />
+                <Route path="kategorie" element={<AdminCategories />} />
+                <Route path="ceniky" element={<AdminPricelists />} />
+                <Route path="klienti" element={<AdminClients />} />
+                <Route path="objednavky" element={<Placeholder title="Objednávky" description="Bude doplněno ve Fázi 5." />} />
+                <Route path="statistiky" element={<Placeholder title="Statistiky" description="Bude doplněno ve Fázi 5." />} />
+                <Route path="nastaveni" element={<Placeholder title="Nastavení" description="Bude doplněno později." />} />
+              </Route>
 
               <Route path="*" element={<NotFound />} />
             </Route>
