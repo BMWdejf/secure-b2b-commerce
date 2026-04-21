@@ -39,6 +39,8 @@ const features = [
 ];
 
 export default function Index() {
+  const { data: categories = [] } = useQuery({ queryKey: ["categories"], queryFn: fetchCategories });
+
   return (
     <div className="animate-fade-in">
       {/* HERO */}
