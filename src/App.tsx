@@ -7,6 +7,8 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import PublicLayout from "@/components/layout/PublicLayout";
 import Index from "./pages/Index";
+import Catalog from "./pages/Catalog";
+import ProductDetail from "./pages/ProductDetail";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import RegisterDone from "./pages/RegisterDone";
@@ -30,7 +32,8 @@ const App = () => (
             <Route element={<PublicLayout />}>
               {/* Veřejné stránky */}
               <Route path="/" element={<Index />} />
-              <Route path="/katalog" element={<Placeholder title="Katalog produktů" description="Bude doplněno ve Fázi 2 — kategorie, filtry, detail produktu." />} />
+              <Route path="/katalog" element={<Catalog />} />
+              <Route path="/produkt/:slug" element={<ProductDetail />} />
               <Route path="/o-nas" element={<Placeholder title="O nás" />} />
               <Route path="/kontakt" element={<Placeholder title="Kontakt" />} />
 
