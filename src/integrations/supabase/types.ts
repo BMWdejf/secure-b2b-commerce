@@ -124,6 +124,7 @@ export type Database = {
           name: string
           notes: string | null
           phone: string | null
+          pricelist_id: string | null
           updated_at: string
         }
         Insert: {
@@ -135,6 +136,7 @@ export type Database = {
           name: string
           notes?: string | null
           phone?: string | null
+          pricelist_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -146,6 +148,119 @@ export type Database = {
           name?: string
           notes?: string | null
           phone?: string | null
+          pricelist_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "companies_pricelist_id_fkey"
+            columns: ["pricelist_id"]
+            isOneToOne: false
+            referencedRelation: "pricelists"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inventory: {
+        Row: {
+          low_stock_threshold: number
+          product_id: string
+          qty_available: number
+          updated_at: string
+        }
+        Insert: {
+          low_stock_threshold?: number
+          product_id: string
+          qty_available?: number
+          updated_at?: string
+        }
+        Update: {
+          low_stock_threshold?: number
+          product_id?: string
+          qty_available?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: true
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pricelist_items: {
+        Row: {
+          created_at: string
+          id: string
+          min_qty: number
+          pricelist_id: string
+          product_id: string
+          unit_price: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          min_qty?: number
+          pricelist_id: string
+          product_id: string
+          unit_price: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          min_qty?: number
+          pricelist_id?: string
+          product_id?: string
+          unit_price?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pricelist_items_pricelist_id_fkey"
+            columns: ["pricelist_id"]
+            isOneToOne: false
+            referencedRelation: "pricelists"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pricelist_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pricelists: {
+        Row: {
+          created_at: string
+          currency: string
+          id: string
+          is_default: boolean
+          name: string
+          notes: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          currency?: string
+          id?: string
+          is_default?: boolean
+          name: string
+          notes?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          currency?: string
+          id?: string
+          is_default?: boolean
+          name?: string
+          notes?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -315,6 +430,7 @@ export type Database = {
     }
     Functions: {
       get_user_company_id: { Args: { _user_id: string }; Returns: string }
+      get_user_pricelist_id: { Args: { _user_id: string }; Returns: string }
       get_user_status: {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["profile_status"]
