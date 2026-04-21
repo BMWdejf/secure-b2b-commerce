@@ -1,7 +1,9 @@
 import { Link } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ArrowRight, Package, FileText, Users, ShieldCheck, Truck, Zap } from "lucide-react";
+import { fetchCategories } from "@/lib/api/catalog";
 
 const features = [
   {
