@@ -1,7 +1,9 @@
 import { Link } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ArrowRight, Package, FileText, Users, ShieldCheck, Truck, Zap } from "lucide-react";
+import { fetchCategories } from "@/lib/api/catalog";
 
 const features = [
   {
@@ -37,6 +39,8 @@ const features = [
 ];
 
 export default function Index() {
+  const { data: categories = [] } = useQuery({ queryKey: ["categories"], queryFn: fetchCategories });
+
   return (
     <div className="animate-fade-in">
       {/* HERO */}
@@ -90,6 +94,39 @@ export default function Index() {
           </div>
         </div>
       </section>
+
+      {/* CATEGORIES */}
+      {categories.length > 0 && (
+        <section className="container py-16 md:py-20">
+          <div className="mb-10 flex items-end justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium text-accent">Sortiment</p>
+              <h2 className="mt-1 font-display text-3xl font-bold md:text-4xl">Procházejte podle kategorie</h2>
+            </div>
+            <Button variant="ghost" asChild className="hidden sm:inline-flex">
+              <Link to="/katalog">Celý katalog <ArrowRight className="ml-2 h-4 w-4" /></Link>
+            </Button>
+          </div>
+          <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+            {categories.slice(0, 8).map((c) => (
+              <Link
+                key={c.id}
+                to={`/katalog?kategorie=${c.slug}`}
+                className="group relative overflow-hidden rounded-xl border border-border bg-card p-6 transition-all hover:-translate-y-1 hover:border-primary/30 hover:shadow-soft"
+              >
+                <div className="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary transition-colors group-hover:bg-primary group-hover:text-primary-foreground">
+                  <Package className="h-5 w-5" />
+                </div>
+                <h3 className="font-semibold leading-tight">{c.name}</h3>
+                {c.description && (
+                  <p className="mt-1.5 line-clamp-2 text-xs text-muted-foreground">{c.description}</p>
+                )}
+                <ArrowRight className="absolute bottom-5 right-5 h-4 w-4 text-muted-foreground opacity-0 transition-all group-hover:translate-x-1 group-hover:opacity-100" />
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* FEATURES */}
       <section className="container py-20 md:py-28">
