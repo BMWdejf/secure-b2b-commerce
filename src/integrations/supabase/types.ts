@@ -14,16 +14,179 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      addresses: {
+        Row: {
+          city: string
+          company_id: string
+          contact_name: string | null
+          country: string
+          created_at: string
+          id: string
+          is_default: boolean
+          kind: Database["public"]["Enums"]["address_kind"]
+          label: string | null
+          phone: string | null
+          postal_code: string
+          street: string
+          updated_at: string
+        }
+        Insert: {
+          city: string
+          company_id: string
+          contact_name?: string | null
+          country?: string
+          created_at?: string
+          id?: string
+          is_default?: boolean
+          kind: Database["public"]["Enums"]["address_kind"]
+          label?: string | null
+          phone?: string | null
+          postal_code: string
+          street: string
+          updated_at?: string
+        }
+        Update: {
+          city?: string
+          company_id?: string
+          contact_name?: string | null
+          country?: string
+          created_at?: string
+          id?: string
+          is_default?: boolean
+          kind?: Database["public"]["Enums"]["address_kind"]
+          label?: string | null
+          phone?: string | null
+          postal_code?: string
+          street?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "addresses_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      companies: {
+        Row: {
+          created_at: string
+          dic: string | null
+          email: string | null
+          ico: string | null
+          id: string
+          name: string
+          notes: string | null
+          phone: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          dic?: string | null
+          email?: string | null
+          ico?: string | null
+          id?: string
+          name: string
+          notes?: string | null
+          phone?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          dic?: string | null
+          email?: string | null
+          ico?: string | null
+          id?: string
+          name?: string
+          notes?: string | null
+          phone?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          company_id: string | null
+          created_at: string
+          full_name: string
+          id: string
+          phone: string | null
+          status: Database["public"]["Enums"]["profile_status"]
+          updated_at: string
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string
+          full_name?: string
+          id: string
+          phone?: string | null
+          status?: Database["public"]["Enums"]["profile_status"]
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string
+          full_name?: string
+          id?: string
+          phone?: string | null
+          status?: Database["public"]["Enums"]["profile_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profiles_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_user_company_id: { Args: { _user_id: string }; Returns: string }
+      get_user_status: {
+        Args: { _user_id: string }
+        Returns: Database["public"]["Enums"]["profile_status"]
+      }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      address_kind: "billing" | "shipping"
+      app_role: "admin" | "client"
+      profile_status: "pending" | "approved" | "blocked"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +313,10 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      address_kind: ["billing", "shipping"],
+      app_role: ["admin", "client"],
+      profile_status: ["pending", "approved", "blocked"],
+    },
   },
 } as const
