@@ -4,6 +4,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { CartProvider } from "@/contexts/CartContext";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import PublicLayout from "@/components/layout/PublicLayout";
 import Index from "./pages/Index";
@@ -15,6 +16,12 @@ import RegisterDone from "./pages/RegisterDone";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import AccountHome from "./pages/account/AccountHome";
+import Cart from "./pages/account/Cart";
+import Checkout from "./pages/account/Checkout";
+import MyOrders from "./pages/account/MyOrders";
+import OrderDetail from "./pages/account/OrderDetail";
+import Addresses from "./pages/account/Addresses";
+import Profile from "./pages/account/Profile";
 import AdminLayout from "@/components/layout/AdminLayout";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminProducts from "./pages/admin/AdminProducts";
@@ -34,88 +41,54 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <AuthProvider>
-          <Routes>
-            <Route element={<PublicLayout />}>
-              {/* Veřejné stránky */}
-              <Route path="/" element={<Index />} />
-              <Route path="/katalog" element={<Catalog />} />
-              <Route path="/produkt/:slug" element={<ProductDetail />} />
-              <Route path="/o-nas" element={<Placeholder title="O nás" />} />
-              <Route path="/kontakt" element={<Placeholder title="Kontakt" />} />
+          <CartProvider>
+            <Routes>
+              <Route element={<PublicLayout />}>
+                {/* Veřejné stránky */}
+                <Route path="/" element={<Index />} />
+                <Route path="/katalog" element={<Catalog />} />
+                <Route path="/produkt/:slug" element={<ProductDetail />} />
+                <Route path="/o-nas" element={<Placeholder title="O nás" />} />
+                <Route path="/kontakt" element={<Placeholder title="Kontakt" />} />
 
-              {/* Auth */}
-              <Route path="/prihlaseni" element={<Login />} />
-              <Route path="/registrace" element={<Register />} />
-              <Route path="/registrace-hotovo" element={<RegisterDone />} />
-              <Route path="/zapomenute-heslo" element={<ForgotPassword />} />
-              <Route path="/reset-password" element={<ResetPassword />} />
+                {/* Auth */}
+                <Route path="/prihlaseni" element={<Login />} />
+                <Route path="/registrace" element={<Register />} />
+                <Route path="/registrace-hotovo" element={<RegisterDone />} />
+                <Route path="/zapomenute-heslo" element={<ForgotPassword />} />
+                <Route path="/reset-password" element={<ResetPassword />} />
 
-              {/* Klientská zóna (vyžaduje přihlášení) */}
-              <Route
-                path="/ucet"
-                element={
-                  <ProtectedRoute>
-                    <AccountHome />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/ucet/objednavky"
-                element={
-                  <ProtectedRoute requireApproved>
-                    <Placeholder title="Moje objednávky" description="Bude doplněno ve Fázi 4." />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/ucet/faktury"
-                element={
-                  <ProtectedRoute requireApproved>
-                    <Placeholder title="Faktury" description="Bude doplněno ve Fázi 5." />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/ucet/adresy"
-                element={
-                  <ProtectedRoute>
-                    <Placeholder title="Adresy" description="Bude doplněno ve Fázi 4." />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/ucet/profil"
-                element={
-                  <ProtectedRoute>
-                    <Placeholder title="Můj profil" description="Bude doplněno ve Fázi 4." />
-                  </ProtectedRoute>
-                }
-              />
+                {/* Klientská zóna */}
+                <Route path="/ucet" element={<ProtectedRoute><AccountHome /></ProtectedRoute>} />
+                <Route path="/ucet/kosik" element={<ProtectedRoute><Cart /></ProtectedRoute>} />
+                <Route path="/ucet/checkout" element={<ProtectedRoute requireApproved><Checkout /></ProtectedRoute>} />
+                <Route path="/ucet/objednavky" element={<ProtectedRoute requireApproved><MyOrders /></ProtectedRoute>} />
+                <Route path="/ucet/objednavky/:id" element={<ProtectedRoute requireApproved><OrderDetail /></ProtectedRoute>} />
+                <Route path="/ucet/faktury" element={<ProtectedRoute requireApproved><Placeholder title="Faktury" description="Bude doplněno ve Fázi 5." /></ProtectedRoute>} />
+                <Route path="/ucet/adresy" element={<ProtectedRoute><Addresses /></ProtectedRoute>} />
+                <Route path="/ucet/profil" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
 
-              {/* Admin (vyžaduje admin roli) */}
-              <Route
-                path="/admin"
-                element={
-                  <ProtectedRoute requireAdmin>
-                    <AdminLayout />
-                  </ProtectedRoute>
-                }
-              >
-                <Route index element={<AdminDashboard />} />
-                <Route path="produkty" element={<AdminProducts />} />
-                <Route path="produkty/novy" element={<AdminProductForm />} />
-                <Route path="produkty/:id" element={<AdminProductForm />} />
-                <Route path="kategorie" element={<AdminCategories />} />
-                <Route path="ceniky" element={<AdminPricelists />} />
-                <Route path="klienti" element={<AdminClients />} />
-                <Route path="objednavky" element={<Placeholder title="Objednávky" description="Bude doplněno ve Fázi 5." />} />
-                <Route path="statistiky" element={<Placeholder title="Statistiky" description="Bude doplněno ve Fázi 5." />} />
-                <Route path="nastaveni" element={<Placeholder title="Nastavení" description="Bude doplněno později." />} />
+                {/* Admin */}
+                <Route
+                  path="/admin"
+                  element={<ProtectedRoute requireAdmin><AdminLayout /></ProtectedRoute>}
+                >
+                  <Route index element={<AdminDashboard />} />
+                  <Route path="produkty" element={<AdminProducts />} />
+                  <Route path="produkty/novy" element={<AdminProductForm />} />
+                  <Route path="produkty/:id" element={<AdminProductForm />} />
+                  <Route path="kategorie" element={<AdminCategories />} />
+                  <Route path="ceniky" element={<AdminPricelists />} />
+                  <Route path="klienti" element={<AdminClients />} />
+                  <Route path="objednavky" element={<Placeholder title="Objednávky" description="Bude doplněno ve Fázi 5." />} />
+                  <Route path="statistiky" element={<Placeholder title="Statistiky" description="Bude doplněno ve Fázi 5." />} />
+                  <Route path="nastaveni" element={<Placeholder title="Nastavení" description="Bude doplněno později." />} />
+                </Route>
+
+                <Route path="*" element={<NotFound />} />
               </Route>
-
-              <Route path="*" element={<NotFound />} />
-            </Route>
-          </Routes>
+            </Routes>
+          </CartProvider>
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>

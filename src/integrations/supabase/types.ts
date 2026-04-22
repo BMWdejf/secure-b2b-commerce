@@ -70,6 +70,33 @@ export type Database = {
           },
         ]
       }
+      cart_items: {
+        Row: {
+          created_at: string
+          id: string
+          product_id: string
+          qty: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          product_id: string
+          qty?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          product_id?: string
+          qty?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       categories: {
         Row: {
           created_at: string
@@ -189,6 +216,113 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      order_items: {
+        Row: {
+          created_at: string
+          id: string
+          line_total: number
+          order_id: string
+          product_id: string | null
+          product_name: string
+          product_sku: string | null
+          qty: number
+          unit: string
+          unit_price: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          line_total: number
+          order_id: string
+          product_id?: string | null
+          product_name: string
+          product_sku?: string | null
+          qty: number
+          unit?: string
+          unit_price: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          line_total?: number
+          order_id?: string
+          product_id?: string | null
+          product_name?: string
+          product_sku?: string | null
+          qty?: number
+          unit?: string
+          unit_price?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_items_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      orders: {
+        Row: {
+          billing_address: Json | null
+          company_id: string
+          created_at: string
+          created_by: string
+          currency: string
+          customer_note: string | null
+          id: string
+          internal_note: string | null
+          invoice_url: string | null
+          order_number: string
+          shipping: number
+          shipping_address: Json | null
+          status: Database["public"]["Enums"]["order_status"]
+          subtotal: number
+          total: number
+          updated_at: string
+          vat: number
+        }
+        Insert: {
+          billing_address?: Json | null
+          company_id: string
+          created_at?: string
+          created_by: string
+          currency?: string
+          customer_note?: string | null
+          id?: string
+          internal_note?: string | null
+          invoice_url?: string | null
+          order_number?: string
+          shipping?: number
+          shipping_address?: Json | null
+          status?: Database["public"]["Enums"]["order_status"]
+          subtotal?: number
+          total?: number
+          updated_at?: string
+          vat?: number
+        }
+        Update: {
+          billing_address?: Json | null
+          company_id?: string
+          created_at?: string
+          created_by?: string
+          currency?: string
+          customer_note?: string | null
+          id?: string
+          internal_note?: string | null
+          invoice_url?: string | null
+          order_number?: string
+          shipping?: number
+          shipping_address?: Json | null
+          status?: Database["public"]["Enums"]["order_status"]
+          subtotal?: number
+          total?: number
+          updated_at?: string
+          vat?: number
+        }
+        Relationships: []
       }
       pricelist_items: {
         Row: {
@@ -442,10 +576,18 @@ export type Database = {
         }
         Returns: boolean
       }
+      next_order_number: { Args: never; Returns: string }
     }
     Enums: {
       address_kind: "billing" | "shipping"
       app_role: "admin" | "client"
+      order_status:
+        | "new"
+        | "confirmed"
+        | "processing"
+        | "shipped"
+        | "completed"
+        | "cancelled"
       profile_status: "pending" | "approved" | "blocked"
     }
     CompositeTypes: {
@@ -576,6 +718,14 @@ export const Constants = {
     Enums: {
       address_kind: ["billing", "shipping"],
       app_role: ["admin", "client"],
+      order_status: [
+        "new",
+        "confirmed",
+        "processing",
+        "shipped",
+        "completed",
+        "cancelled",
+      ],
       profile_status: ["pending", "approved", "blocked"],
     },
   },

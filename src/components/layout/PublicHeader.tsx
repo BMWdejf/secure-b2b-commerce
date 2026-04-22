@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { LogOut, User as UserIcon, ShieldCheck, Menu, X } from "lucide-react";
 import { useState } from "react";
+import { CartIcon } from "@/components/cart/CartIcon";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -52,6 +53,7 @@ export function PublicHeader() {
         </nav>
 
         <div className="hidden items-center gap-2 md:flex">
+          <CartIcon />
           {user ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>

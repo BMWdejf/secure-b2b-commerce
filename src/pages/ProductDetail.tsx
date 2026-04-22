@@ -7,13 +7,17 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { PriceGate } from "@/components/catalog/PriceGate";
-import { ChevronRight, Package, ShoppingCart } from "lucide-react";
+import { ChevronRight, Package, ShoppingCart, Minus, Plus } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useCart } from "@/contexts/CartContext";
+import { Input } from "@/components/ui/input";
 
 export default function ProductDetail() {
   const { slug = "" } = useParams();
   const { user, isApproved } = useAuth();
+  const { add } = useCart();
   const [activeImage, setActiveImage] = useState(0);
+  const [qty, setQty] = useState(1);
 
   const { data, isLoading } = useQuery({
     queryKey: ["product", slug],
@@ -126,8 +130,31 @@ export default function ProductDetail() {
             </div>
           )}
 
-          <div className="flex flex-wrap gap-3 border-t border-border pt-6">
-            <Button size="lg" disabled={!canOrder} className="bg-accent text-accent-foreground hover:bg-accent/90">
+          <div className="flex flex-wrap items-center gap-3 border-t border-border pt-6">
+            {canOrder && (
+              <div className="flex items-center gap-1 rounded-md border border-border">
+                <Button size="icon" variant="ghost" onClick={() => setQty((q) => Math.max(product.moq, q - product.pack_size))}>
+                  <Minus className="h-4 w-4" />
+                </Button>
+                <Input
+                  type="number"
+                  min={product.moq}
+                  step={product.pack_size}
+                  value={qty}
+                  onChange={(e) => setQty(Math.max(product.moq, parseInt(e.target.value || String(product.moq), 10)))}
+                  className="h-9 w-20 border-0 text-center focus-visible:ring-0"
+                />
+                <Button size="icon" variant="ghost" onClick={() => setQty((q) => q + product.pack_size)}>
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
+            <Button
+              size="lg"
+              disabled={!canOrder}
+              onClick={() => canOrder && add(product.id, qty)}
+              className="bg-accent text-accent-foreground hover:bg-accent/90"
+            >
               <ShoppingCart className="mr-2 h-4 w-4" />
               {canOrder ? "Přidat do košíku" : "Objednávka po přihlášení"}
             </Button>
