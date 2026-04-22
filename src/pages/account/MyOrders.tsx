@@ -1,20 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { fetchMyOrders, type OrderStatus } from "@/lib/api/orders";
+import { fetchMyOrders, ORDER_STATUS_CLASS, ORDER_STATUS_LABEL } from "@/lib/api/orders";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Package, ArrowRight } from "lucide-react";
 import { formatDate, formatPrice } from "@/lib/format";
-
-const statusLabel: Record<OrderStatus, { label: string; className: string }> = {
-  new: { label: "Nová", className: "bg-secondary text-foreground" },
-  confirmed: { label: "Potvrzená", className: "bg-primary/10 text-primary" },
-  processing: { label: "Zpracovává se", className: "bg-warning/15 text-warning-foreground" },
-  shipped: { label: "Odeslaná", className: "bg-accent/15 text-accent" },
-  completed: { label: "Dokončená", className: "bg-success/15 text-success-foreground" },
-  cancelled: { label: "Zrušená", className: "bg-destructive/10 text-destructive" },
-};
 
 export default function MyOrders() {
   const { data, isLoading } = useQuery({ queryKey: ["my-orders"], queryFn: fetchMyOrders });
@@ -34,13 +25,12 @@ export default function MyOrders() {
       ) : (
         <div className="space-y-3">
           {data.map((o) => {
-            const s = statusLabel[o.status];
             return (
               <Card key={o.id} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <div className="flex items-center gap-2">
                     <p className="font-semibold">#{o.order_number}</p>
-                    <Badge className={s.className}>{s.label}</Badge>
+                    <Badge className={ORDER_STATUS_CLASS[o.status]}>{ORDER_STATUS_LABEL[o.status]}</Badge>
                   </div>
                   <p className="text-xs text-muted-foreground">{formatDate(o.created_at)}</p>
                 </div>
