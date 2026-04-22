@@ -1,15 +1,26 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
-import { fetchOrderDetail } from "@/lib/api/orders";
+import { fetchOrderDetail, getInvoiceSignedUrl, ORDER_STATUS_CLASS, ORDER_STATUS_LABEL } from "@/lib/api/orders";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, FileDown } from "lucide-react";
 import { formatDate, formatPrice } from "@/lib/format";
+import { toast } from "sonner";
 
 export default function OrderDetail() {
   const { id = "" } = useParams();
   const { data, isLoading } = useQuery({ queryKey: ["order", id], queryFn: () => fetchOrderDetail(id), enabled: !!id });
+
+  async function downloadInvoice() {
+    if (!data?.invoice_url) return;
+    try {
+      const url = await getInvoiceSignedUrl(data.invoice_url);
+      window.open(url, "_blank", "noopener,noreferrer");
+    } catch (e: any) {
+      toast.error(e.message ?? "Fakturu se nepodařilo otevřít.");
+    }
+  }
 
   if (isLoading) return <div className="container py-12 text-muted-foreground">Načítám…</div>;
   if (!data) return <div className="container py-12">Objednávka nebyla nalezena.</div>;
@@ -25,7 +36,7 @@ export default function OrderDetail() {
           <h1 className="font-display text-3xl font-bold">Objednávka #{data.order_number}</h1>
           <p className="text-sm text-muted-foreground">{formatDate(data.created_at)}</p>
         </div>
-        <Badge>{data.status}</Badge>
+        <Badge className={ORDER_STATUS_CLASS[data.status]}>{ORDER_STATUS_LABEL[data.status]}</Badge>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
@@ -66,10 +77,12 @@ export default function OrderDetail() {
           <Row label="DPH" value={formatPrice(data.vat, data.currency)} muted />
           <div className="my-3 border-t border-border" />
           <Row label="Celkem" value={formatPrice(data.total, data.currency)} bold />
-          {data.invoice_url && (
-            <Button asChild variant="outline" className="mt-4 w-full">
-              <a href={data.invoice_url} target="_blank" rel="noreferrer"><FileDown className="mr-2 h-4 w-4" /> Stáhnout fakturu</a>
+          {data.invoice_url ? (
+            <Button onClick={downloadInvoice} variant="outline" className="mt-4 w-full">
+              <FileDown className="mr-2 h-4 w-4" /> Stáhnout fakturu
             </Button>
+          ) : (
+            <p className="mt-4 text-center text-xs text-muted-foreground">Faktura zatím není k dispozici.</p>
           )}
         </Card>
       </div>
