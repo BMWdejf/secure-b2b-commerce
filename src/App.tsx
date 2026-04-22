@@ -29,6 +29,10 @@ import AdminProductForm from "./pages/admin/AdminProductForm";
 import AdminCategories from "./pages/admin/AdminCategories";
 import AdminClients from "./pages/admin/AdminClients";
 import AdminPricelists from "./pages/admin/AdminPricelists";
+import AdminOrders from "./pages/admin/AdminOrders";
+import AdminOrderDetail from "./pages/admin/AdminOrderDetail";
+import AdminStats from "./pages/admin/AdminStats";
+import Invoices from "./pages/account/Invoices";
 import Placeholder from "./pages/Placeholder";
 import NotFound from "./pages/NotFound";
 
@@ -64,7 +68,7 @@ const App = () => (
                 <Route path="/ucet/checkout" element={<ProtectedRoute requireApproved><Checkout /></ProtectedRoute>} />
                 <Route path="/ucet/objednavky" element={<ProtectedRoute requireApproved><MyOrders /></ProtectedRoute>} />
                 <Route path="/ucet/objednavky/:id" element={<ProtectedRoute requireApproved><OrderDetail /></ProtectedRoute>} />
-                <Route path="/ucet/faktury" element={<ProtectedRoute requireApproved><Placeholder title="Faktury" description="Bude doplněno ve Fázi 5." /></ProtectedRoute>} />
+                <Route path="/ucet/faktury" element={<ProtectedRoute requireApproved><Invoices /></ProtectedRoute>} />
                 <Route path="/ucet/adresy" element={<ProtectedRoute><Addresses /></ProtectedRoute>} />
                 <Route path="/ucet/profil" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
 
@@ -80,8 +84,9 @@ const App = () => (
                   <Route path="kategorie" element={<AdminCategories />} />
                   <Route path="ceniky" element={<AdminPricelists />} />
                   <Route path="klienti" element={<AdminClients />} />
-                  <Route path="objednavky" element={<Placeholder title="Objednávky" description="Bude doplněno ve Fázi 5." />} />
-                  <Route path="statistiky" element={<Placeholder title="Statistiky" description="Bude doplněno ve Fázi 5." />} />
+                  <Route path="objednavky" element={<AdminOrders />} />
+                  <Route path="objednavky/:id" element={<AdminOrderDetail />} />
+                  <Route path="statistiky" element={<AdminStats />} />
                   <Route path="nastaveni" element={<Placeholder title="Nastavení" description="Bude doplněno později." />} />
                 </Route>
 
