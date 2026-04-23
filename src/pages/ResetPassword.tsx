@@ -44,6 +44,9 @@ export default function ResetPassword() {
 
       if (next) {
         resolvedValidRef.current = true;
+        if (window.location.search || window.location.hash) {
+          window.history.replaceState({}, document.title, "/reset-password");
+        }
         setValidLink(true);
         return;
       }
@@ -52,21 +55,23 @@ export default function ResetPassword() {
     };
 
     const resolveRecoverySession = async () => {
-      const { data } = await supabase.auth.getSession();
-      if (data.session) {
-        setValidity(true);
-        return;
-      }
-
       if (!hasRecoveryParams()) {
-        setValidity(false);
+        const { data } = await supabase.auth.getSession();
+        setValidity(!!data.session);
         return;
       }
 
-      window.setTimeout(async () => {
-        const { data: delayedData } = await supabase.auth.getSession();
-        setValidity(!!delayedData.session);
-      }, 1800);
+      for (let attempt = 0; attempt < 8; attempt += 1) {
+        const { data } = await supabase.auth.getSession();
+        if (data.session) {
+          setValidity(true);
+          return;
+        }
+
+        await new Promise((resolve) => window.setTimeout(resolve, 500));
+      }
+
+      setValidity(false);
     };
 
     const { data: subscription } = supabase.auth.onAuthStateChange((event, session) => {
@@ -75,11 +80,9 @@ export default function ResetPassword() {
         event === "SIGNED_IN" ||
         event === "INITIAL_SESSION"
       ) {
-        setValidity(true);
+        setValidity(!!session);
         return;
       }
-
-      if (event === "SIGNED_OUT" && hasRecoveryParams()) setValidity(false);
     });
 
     resolveRecoverySession();
