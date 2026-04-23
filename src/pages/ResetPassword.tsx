@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
@@ -22,6 +22,7 @@ export default function ResetPassword() {
   const [confirm, setConfirm] = useState("");
   const [loading, setLoading] = useState(false);
   const [validLink, setValidLink] = useState<boolean | null>(null);
+  const resolvedValidRef = useRef(false);
 
   useEffect(() => {
     let isActive = true;
@@ -39,39 +40,70 @@ export default function ResetPassword() {
     };
 
     const setValidity = (next: boolean) => {
-      if (isActive) setValidLink(next);
+      if (!isActive) return;
+
+      if (next) {
+        resolvedValidRef.current = true;
+        if (window.location.search || window.location.hash) {
+          window.history.replaceState({}, document.title, "/reset-password");
+        }
+        setValidLink(true);
+        return;
+      }
+
+      setValidLink((current) => (resolvedValidRef.current || current === true ? true : false));
     };
 
     const resolveRecoverySession = async () => {
+      const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
       const searchParams = new URLSearchParams(window.location.search);
+      const accessToken = hashParams.get("access_token");
+      const refreshToken = hashParams.get("refresh_token");
       const code = searchParams.get("code");
+
+      if (accessToken && refreshToken) {
+        const { error } = await supabase.auth.setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken,
+        });
+
+        setValidity(!error);
+        if (!error) return;
+      }
 
       if (code) {
         const { error } = await supabase.auth.exchangeCodeForSession(code);
         setValidity(!error);
-        return;
-      }
-
-      const { data } = await supabase.auth.getSession();
-      if (data.session) {
-        setValidity(true);
-        return;
+        if (!error) return;
       }
 
       if (!hasRecoveryParams()) {
-        setValidity(false);
+        const { data } = await supabase.auth.getSession();
+        setValidity(!!data.session);
         return;
       }
 
-      window.setTimeout(async () => {
-        const { data: delayedData } = await supabase.auth.getSession();
-        setValidity(!!delayedData.session);
-      }, 400);
+      for (let attempt = 0; attempt < 8; attempt += 1) {
+        const { data } = await supabase.auth.getSession();
+        if (data.session) {
+          setValidity(true);
+          return;
+        }
+
+        await new Promise((resolve) => window.setTimeout(resolve, 500));
+      }
+
+      setValidity(false);
     };
 
     const { data: subscription } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === "PASSWORD_RECOVERY" || (event === "SIGNED_IN" && !!session)) {
-        setValidity(true);
+      if (
+        event === "PASSWORD_RECOVERY" ||
+        event === "SIGNED_IN" ||
+        event === "INITIAL_SESSION"
+      ) {
+        setValidity(!!session);
+        return;
       }
     });
 
