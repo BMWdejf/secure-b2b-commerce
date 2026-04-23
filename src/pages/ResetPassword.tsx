@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
@@ -22,6 +22,7 @@ export default function ResetPassword() {
   const [confirm, setConfirm] = useState("");
   const [loading, setLoading] = useState(false);
   const [validLink, setValidLink] = useState<boolean | null>(null);
+  const resolvedValidRef = useRef(false);
 
   useEffect(() => {
     let isActive = true;
@@ -39,19 +40,18 @@ export default function ResetPassword() {
     };
 
     const setValidity = (next: boolean) => {
-      if (isActive) setValidLink(next);
-    };
+      if (!isActive) return;
 
-    const resolveRecoverySession = async () => {
-      const searchParams = new URLSearchParams(window.location.search);
-      const code = searchParams.get("code");
-
-      if (code) {
-        const { error } = await supabase.auth.exchangeCodeForSession(code);
-        setValidity(!error);
+      if (next) {
+        resolvedValidRef.current = true;
+        setValidLink(true);
         return;
       }
 
+      setValidLink((current) => (resolvedValidRef.current || current === true ? true : false));
+    };
+
+    const resolveRecoverySession = async () => {
       const { data } = await supabase.auth.getSession();
       if (data.session) {
         setValidity(true);
@@ -66,13 +66,20 @@ export default function ResetPassword() {
       window.setTimeout(async () => {
         const { data: delayedData } = await supabase.auth.getSession();
         setValidity(!!delayedData.session);
-      }, 400);
+      }, 1800);
     };
 
     const { data: subscription } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === "PASSWORD_RECOVERY" || (event === "SIGNED_IN" && !!session)) {
+      if (
+        event === "PASSWORD_RECOVERY" ||
+        event === "SIGNED_IN" ||
+        event === "INITIAL_SESSION"
+      ) {
         setValidity(true);
+        return;
       }
+
+      if (event === "SIGNED_OUT" && hasRecoveryParams()) setValidity(false);
     });
 
     resolveRecoverySession();
