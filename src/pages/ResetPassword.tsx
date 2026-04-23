@@ -55,6 +55,28 @@ export default function ResetPassword() {
     };
 
     const resolveRecoverySession = async () => {
+      const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+      const searchParams = new URLSearchParams(window.location.search);
+      const accessToken = hashParams.get("access_token");
+      const refreshToken = hashParams.get("refresh_token");
+      const code = searchParams.get("code");
+
+      if (accessToken && refreshToken) {
+        const { error } = await supabase.auth.setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken,
+        });
+
+        setValidity(!error);
+        if (!error) return;
+      }
+
+      if (code) {
+        const { error } = await supabase.auth.exchangeCodeForSession(code);
+        setValidity(!error);
+        if (!error) return;
+      }
+
       if (!hasRecoveryParams()) {
         const { data } = await supabase.auth.getSession();
         setValidity(!!data.session);
