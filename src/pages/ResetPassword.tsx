@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,14 +24,63 @@ export default function ResetPassword() {
   const [validLink, setValidLink] = useState<boolean | null>(null);
 
   useEffect(() => {
-    // Recovery flow: Supabase v hash linku → SDK ji při loadu zpracuje a vyvolá PASSWORD_RECOVERY event
-    const hash = window.location.hash;
-    if (hash.includes("type=recovery") || hash.includes("access_token")) {
-      setValidLink(true);
-    } else {
-      // I bez hashe může být relace recovery (pokud SDK už hash strávil)
-      supabase.auth.getSession().then(({ data }) => setValidLink(!!data.session));
-    }
+    let isActive = true;
+
+    const hasRecoveryParams = () => {
+      const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+      const searchParams = new URLSearchParams(window.location.search);
+
+      return (
+        hashParams.get("type") === "recovery" ||
+        Boolean(hashParams.get("access_token")) ||
+        searchParams.get("type") === "recovery" ||
+        Boolean(searchParams.get("code"))
+      );
+    };
+
+    const setValidity = (next: boolean) => {
+      if (isActive) setValidLink(next);
+    };
+
+    const resolveRecoverySession = async () => {
+      const searchParams = new URLSearchParams(window.location.search);
+      const code = searchParams.get("code");
+
+      if (code) {
+        const { error } = await supabase.auth.exchangeCodeForSession(code);
+        setValidity(!error);
+        return;
+      }
+
+      const { data } = await supabase.auth.getSession();
+      if (data.session) {
+        setValidity(true);
+        return;
+      }
+
+      if (!hasRecoveryParams()) {
+        setValidity(false);
+        return;
+      }
+
+      window.setTimeout(async () => {
+        const { data: delayedData } = await supabase.auth.getSession();
+        setValidity(!!delayedData.session);
+      }, 400);
+    };
+
+    const { data: subscription } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "PASSWORD_RECOVERY" || (event === "SIGNED_IN" && !!session)) {
+        setValidity(true);
+      }
+    });
+
+    resolveRecoverySession();
+
+    return () => {
+      isActive = false;
+      subscription.subscription.unsubscribe();
+    };
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -61,7 +110,11 @@ export default function ResetPassword() {
           <CardDescription>Zadejte si prosím nové heslo</CardDescription>
         </CardHeader>
         <CardContent>
-          {validLink === false ? (
+          {validLink === null ? (
+            <div className="flex justify-center py-6">
+              <Loader2 className="h-6 w-6 animate-spin text-primary" />
+            </div>
+          ) : validLink === false ? (
             <p className="text-center text-sm text-muted-foreground">
               Odkaz pro reset hesla je neplatný nebo vypršel. Požádejte o nový.
             </p>
@@ -81,6 +134,11 @@ export default function ResetPassword() {
               </Button>
             </form>
           )}
+          {validLink === false ? (
+            <Button asChild variant="outline" className="mt-4 w-full">
+              <Link to="/zapomenute-heslo">Požádat o nový odkaz</Link>
+            </Button>
+          ) : null}
         </CardContent>
       </Card>
     </div>
