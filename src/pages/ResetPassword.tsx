@@ -44,7 +44,44 @@ export default function ResetPassword() {
     let active = true;
 
     const resolve = async () => {
-      const recoveryFlag = window.sessionStorage.getItem(PASSWORD_RECOVERY_STORAGE_KEY) === "1";
+      const searchParams = new URLSearchParams(window.location.search);
+      const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+      const code = searchParams.get("code");
+      const tokenHash = searchParams.get("token_hash") ?? hashParams.get("token_hash");
+      const type = searchParams.get("type") ?? hashParams.get("type");
+      const accessToken = hashParams.get("access_token");
+      const refreshToken = hashParams.get("refresh_token");
+
+      let recoveryFlag = window.sessionStorage.getItem(PASSWORD_RECOVERY_STORAGE_KEY) === "1";
+
+      if (!recoveryFlag) {
+        let directRecoveryOk = false;
+
+        if (code) {
+          const { error } = await supabase.auth.exchangeCodeForSession(code);
+          directRecoveryOk = !error;
+        } else if (tokenHash && type === "recovery") {
+          const { error } = await supabase.auth.verifyOtp({
+            token_hash: tokenHash,
+            type: "recovery",
+          });
+          directRecoveryOk = !error;
+        } else if (accessToken && refreshToken) {
+          const { error } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken,
+          });
+          directRecoveryOk = !error;
+        }
+
+        if (directRecoveryOk) {
+          window.sessionStorage.setItem(PASSWORD_RECOVERY_STORAGE_KEY, "1");
+          recoveryFlag = true;
+          if (window.location.search || window.location.hash) {
+            window.history.replaceState({}, document.title, "/reset-password");
+          }
+        }
+      }
 
       for (let attempt = 0; attempt < 12; attempt += 1) {
         const { data } = await supabase.auth.getSession();
@@ -64,9 +101,10 @@ export default function ResetPassword() {
       setRecoveryError("Resetovací odkaz není aktivní. Otevřete prosím nejnovější odkaz z e-mailu.");
     };
 
-    const { data: subscription } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: subscription } = supabase.auth.onAuthStateChange((event, session) => {
       const recoveryFlag = window.sessionStorage.getItem(PASSWORD_RECOVERY_STORAGE_KEY) === "1";
-      if (recoveryFlag && session) {
+      if ((recoveryFlag || event === "PASSWORD_RECOVERY") && session) {
+        window.sessionStorage.setItem(PASSWORD_RECOVERY_STORAGE_KEY, "1");
         setRecoveryError(null);
         setRecoveryReady(true);
       }
