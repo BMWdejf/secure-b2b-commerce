@@ -82,6 +82,12 @@ export const establishRecoverySession = async (payload?: RecoveryPayload | null)
     return { ok: true as const, error: null };
   }
 
+  const delayedSession = await waitForSession(12, 250);
+  if (delayedSession) {
+    markRecoveryReady();
+    return { ok: true as const, error: null };
+  }
+
   if (!activePayload || !hasRecoveryPayload(activePayload)) {
     return { ok: false as const, error: "missing_recovery_payload" };
   }
