@@ -13,6 +13,7 @@ import ProductDetail from "./pages/ProductDetail";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import RegisterDone from "./pages/RegisterDone";
+import AuthCallback from "./pages/AuthCallback";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import AccountHome from "./pages/account/AccountHome";
@@ -59,6 +60,7 @@ const App = () => (
                 <Route path="/prihlaseni" element={<Login />} />
                 <Route path="/registrace" element={<Register />} />
                 <Route path="/registrace-hotovo" element={<RegisterDone />} />
+                <Route path="/auth/callback" element={<AuthCallback />} />
                 <Route path="/zapomenute-heslo" element={<ForgotPassword />} />
                 <Route path="/reset-password" element={<ResetPassword />} />
 
