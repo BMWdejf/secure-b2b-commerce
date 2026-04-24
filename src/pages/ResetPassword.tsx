@@ -8,6 +8,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { AlertCircle, CheckCircle2, Circle, Loader2 } from "lucide-react";
+import {
+  cleanupRecoveryUrl,
+  clearRecoveryState,
+  establishRecoverySession,
+  getRecoveryPayloadFromUrl,
+  hasRecoveryPayload,
+  isRecoveryReadyFlagSet,
+  markRecoveryReady,
+  storeRecoveryPayload,
+} from "@/lib/auth/passwordRecovery";
 
 const schema = z
   .object({
@@ -15,8 +25,6 @@ const schema = z
     confirm: z.string(),
   })
   .refine((d) => d.password === d.confirm, { message: "Hesla se neshodují", path: ["confirm"] });
-
-const PASSWORD_RECOVERY_STORAGE_KEY = "password-recovery-ready";
 
 export default function ResetPassword() {
   const navigate = useNavigate();
@@ -44,67 +52,30 @@ export default function ResetPassword() {
     let active = true;
 
     const resolve = async () => {
-      const searchParams = new URLSearchParams(window.location.search);
-      const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
-      const code = searchParams.get("code");
-      const tokenHash = searchParams.get("token_hash") ?? hashParams.get("token_hash");
-      const type = searchParams.get("type") ?? hashParams.get("type");
-      const accessToken = hashParams.get("access_token");
-      const refreshToken = hashParams.get("refresh_token");
-
-      let recoveryFlag = window.sessionStorage.getItem(PASSWORD_RECOVERY_STORAGE_KEY) === "1";
-
-      if (!recoveryFlag) {
-        let directRecoveryOk = false;
-
-        if (code) {
-          const { error } = await supabase.auth.exchangeCodeForSession(code);
-          directRecoveryOk = !error;
-        } else if (tokenHash && type === "recovery") {
-          const { error } = await supabase.auth.verifyOtp({
-            token_hash: tokenHash,
-            type: "recovery",
-          });
-          directRecoveryOk = !error;
-        } else if (accessToken && refreshToken) {
-          const { error } = await supabase.auth.setSession({
-            access_token: accessToken,
-            refresh_token: refreshToken,
-          });
-          directRecoveryOk = !error;
-        }
-
-        if (directRecoveryOk) {
-          window.sessionStorage.setItem(PASSWORD_RECOVERY_STORAGE_KEY, "1");
-          recoveryFlag = true;
-          if (window.location.search || window.location.hash) {
-            window.history.replaceState({}, document.title, "/reset-password");
-          }
-        }
+      const payload = getRecoveryPayloadFromUrl();
+      if (hasRecoveryPayload(payload)) {
+        storeRecoveryPayload(payload);
       }
 
-      for (let attempt = 0; attempt < 12; attempt += 1) {
-        const { data } = await supabase.auth.getSession();
-        if (!active) return;
-
-        if (recoveryFlag && data.session) {
-          setRecoveryError(null);
-          setRecoveryReady(true);
-          return;
-        }
-
-        await new Promise((resolveAttempt) => window.setTimeout(resolveAttempt, 250));
-      }
+      const result = await establishRecoverySession(hasRecoveryPayload(payload) ? payload : null);
 
       if (!active) return;
+
+      if (result.ok || isRecoveryReadyFlagSet()) {
+        markRecoveryReady();
+        cleanupRecoveryUrl("/reset-password");
+        setRecoveryError(null);
+        setRecoveryReady(true);
+        return;
+      }
+
       setRecoveryReady(false);
       setRecoveryError("Resetovací odkaz není aktivní. Otevřete prosím nejnovější odkaz z e-mailu.");
     };
 
     const { data: subscription } = supabase.auth.onAuthStateChange((event, session) => {
-      const recoveryFlag = window.sessionStorage.getItem(PASSWORD_RECOVERY_STORAGE_KEY) === "1";
-      if ((recoveryFlag || event === "PASSWORD_RECOVERY") && session) {
-        window.sessionStorage.setItem(PASSWORD_RECOVERY_STORAGE_KEY, "1");
+      if ((isRecoveryReadyFlagSet() || event === "PASSWORD_RECOVERY") && session) {
+        markRecoveryReady();
         setRecoveryError(null);
         setRecoveryReady(true);
       }
@@ -137,10 +108,10 @@ export default function ResetPassword() {
 
     setLoading(true);
 
-    const recoveryFlag = window.sessionStorage.getItem(PASSWORD_RECOVERY_STORAGE_KEY) === "1";
+    const recovered = await establishRecoverySession();
     const { data: sessionData } = await supabase.auth.getSession();
 
-    if (!recoveryFlag || !sessionData.session) {
+    if (!recovered.ok || !sessionData.session) {
       setLoading(false);
       setRecoveryReady(false);
       setRecoveryError("Nepodařilo se ověřit resetovací odkaz. Požádejte prosím o nový.");
@@ -154,7 +125,7 @@ export default function ResetPassword() {
       toast.error(error.message);
       return;
     }
-    window.sessionStorage.removeItem(PASSWORD_RECOVERY_STORAGE_KEY);
+    clearRecoveryState();
     toast.success("Heslo bylo změněno. Můžete se přihlásit.");
     await supabase.auth.signOut();
     navigate("/prihlaseni", { replace: true });
