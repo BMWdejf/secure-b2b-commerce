@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,8 @@ const schema = z
   })
   .refine((d) => d.password === d.confirm, { message: "Hesla se neshodují", path: ["confirm"] });
 
+const PASSWORD_RECOVERY_STORAGE_KEY = "password-recovery-ready";
+
 export default function ResetPassword() {
   const navigate = useNavigate();
   const [password, setPassword] = useState("");
@@ -23,9 +25,6 @@ export default function ResetPassword() {
   const [loading, setLoading] = useState(false);
   const [recoveryReady, setRecoveryReady] = useState<boolean | null>(null);
   const [recoveryError, setRecoveryError] = useState<string | null>(null);
-  const resolvedValidRef = useRef(false);
-  const initialSearchRef = useRef(window.location.search);
-  const initialHashRef = useRef(window.location.hash);
 
   const passwordChecks = useMemo(
     () => [
@@ -41,118 +40,83 @@ export default function ResetPassword() {
   const strongPassword = passwordChecks.every((check) => check.ok);
   const passwordsMatch = confirm.length > 0 && password === confirm;
 
-  const getRecoveryParams = useCallback(() => {
-    const activeSearch = window.location.search || initialSearchRef.current;
-    const activeHash = window.location.hash || initialHashRef.current;
-    const hashParams = new URLSearchParams(activeHash.replace(/^#/, ""));
-    const searchParams = new URLSearchParams(activeSearch);
-
-    return {
-      accessToken: hashParams.get("access_token"),
-      refreshToken: hashParams.get("refresh_token"),
-      code: searchParams.get("code"),
-      tokenHash: searchParams.get("token_hash") ?? hashParams.get("token_hash"),
-      type: searchParams.get("type") ?? hashParams.get("type"),
-      hasRecoveryParams:
-        hashParams.get("type") === "recovery" ||
-        Boolean(hashParams.get("access_token")) ||
-        searchParams.get("type") === "recovery" ||
-        Boolean(searchParams.get("code")) ||
-        Boolean(searchParams.get("token_hash")) ||
-        Boolean(hashParams.get("token_hash")),
-    };
-  }, []);
-
-  const markRecoveryValidity = useCallback((next: boolean, errorMessage?: string) => {
-    if (next) {
-      resolvedValidRef.current = true;
-      if (window.location.search || window.location.hash) {
-        window.history.replaceState({}, document.title, "/reset-password");
-      }
-      setRecoveryError(null);
-      setRecoveryReady(true);
-      return;
-    }
-
-    if (resolvedValidRef.current) {
-      setRecoveryReady(true);
-      return;
-    }
-
-    setRecoveryReady(false);
-    setRecoveryError(errorMessage ?? "Odkaz pro reset hesla je neplatný nebo vypršel. Požádejte o nový.");
-  }, []);
-
-  const resolveRecoverySession = useCallback(async () => {
-    const { accessToken, refreshToken, code, tokenHash, type, hasRecoveryParams } = getRecoveryParams();
-
-    if (accessToken && refreshToken) {
-      const { error } = await supabase.auth.setSession({
-        access_token: accessToken,
-        refresh_token: refreshToken,
-      });
-
-      if (!error) {
-        markRecoveryValidity(true);
-        return true;
-      }
-    }
-
-    if (code) {
-      const { error } = await supabase.auth.exchangeCodeForSession(code);
-      if (!error) {
-        markRecoveryValidity(true);
-        return true;
-      }
-    }
-
-    if (tokenHash && type === "recovery") {
-      const { error } = await supabase.auth.verifyOtp({
-        token_hash: tokenHash,
-        type: "recovery",
-      });
-      if (!error) {
-        markRecoveryValidity(true);
-        return true;
-      }
-    }
-
-    for (let attempt = 0; attempt < (hasRecoveryParams ? 10 : 2); attempt += 1) {
-      const { data } = await supabase.auth.getSession();
-      if (data.session) {
-        markRecoveryValidity(true);
-        return true;
-      }
-
-      await new Promise((resolve) => window.setTimeout(resolve, 350));
-    }
-
-    markRecoveryValidity(false);
-    return false;
-  }, [getRecoveryParams, markRecoveryValidity]);
-
   useEffect(() => {
-    let isActive = true;
+    let active = true;
+
+    const resolve = async () => {
+      const searchParams = new URLSearchParams(window.location.search);
+      const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+      const code = searchParams.get("code");
+      const tokenHash = searchParams.get("token_hash") ?? hashParams.get("token_hash");
+      const type = searchParams.get("type") ?? hashParams.get("type");
+      const accessToken = hashParams.get("access_token");
+      const refreshToken = hashParams.get("refresh_token");
+
+      let recoveryFlag = window.sessionStorage.getItem(PASSWORD_RECOVERY_STORAGE_KEY) === "1";
+
+      if (!recoveryFlag) {
+        let directRecoveryOk = false;
+
+        if (code) {
+          const { error } = await supabase.auth.exchangeCodeForSession(code);
+          directRecoveryOk = !error;
+        } else if (tokenHash && type === "recovery") {
+          const { error } = await supabase.auth.verifyOtp({
+            token_hash: tokenHash,
+            type: "recovery",
+          });
+          directRecoveryOk = !error;
+        } else if (accessToken && refreshToken) {
+          const { error } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken,
+          });
+          directRecoveryOk = !error;
+        }
+
+        if (directRecoveryOk) {
+          window.sessionStorage.setItem(PASSWORD_RECOVERY_STORAGE_KEY, "1");
+          recoveryFlag = true;
+          if (window.location.search || window.location.hash) {
+            window.history.replaceState({}, document.title, "/reset-password");
+          }
+        }
+      }
+
+      for (let attempt = 0; attempt < 12; attempt += 1) {
+        const { data } = await supabase.auth.getSession();
+        if (!active) return;
+
+        if (recoveryFlag && data.session) {
+          setRecoveryError(null);
+          setRecoveryReady(true);
+          return;
+        }
+
+        await new Promise((resolveAttempt) => window.setTimeout(resolveAttempt, 250));
+      }
+
+      if (!active) return;
+      setRecoveryReady(false);
+      setRecoveryError("Resetovací odkaz není aktivní. Otevřete prosím nejnovější odkaz z e-mailu.");
+    };
 
     const { data: subscription } = supabase.auth.onAuthStateChange((event, session) => {
-      if (!isActive) return;
-
-      if (
-        event === "PASSWORD_RECOVERY" ||
-        event === "SIGNED_IN" ||
-        event === "INITIAL_SESSION"
-      ) {
-        markRecoveryValidity(!!session);
+      const recoveryFlag = window.sessionStorage.getItem(PASSWORD_RECOVERY_STORAGE_KEY) === "1";
+      if ((recoveryFlag || event === "PASSWORD_RECOVERY") && session) {
+        window.sessionStorage.setItem(PASSWORD_RECOVERY_STORAGE_KEY, "1");
+        setRecoveryError(null);
+        setRecoveryReady(true);
       }
     });
 
-    void resolveRecoverySession();
+    void resolve();
 
     return () => {
-      isActive = false;
+      active = false;
       subscription.subscription.unsubscribe();
     };
-  }, [markRecoveryValidity, resolveRecoverySession]);
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -173,14 +137,10 @@ export default function ResetPassword() {
 
     setLoading(true);
 
-    let { data: sessionData } = await supabase.auth.getSession();
-    if (!sessionData.session) {
-      await resolveRecoverySession();
-      const retrySession = await supabase.auth.getSession();
-      sessionData = retrySession.data;
-    }
+    const recoveryFlag = window.sessionStorage.getItem(PASSWORD_RECOVERY_STORAGE_KEY) === "1";
+    const { data: sessionData } = await supabase.auth.getSession();
 
-    if (!sessionData.session) {
+    if (!recoveryFlag || !sessionData.session) {
       setLoading(false);
       setRecoveryReady(false);
       setRecoveryError("Nepodařilo se ověřit resetovací odkaz. Požádejte prosím o nový.");
@@ -194,6 +154,7 @@ export default function ResetPassword() {
       toast.error(error.message);
       return;
     }
+    window.sessionStorage.removeItem(PASSWORD_RECOVERY_STORAGE_KEY);
     toast.success("Heslo bylo změněno. Můžete se přihlásit.");
     await supabase.auth.signOut();
     navigate("/prihlaseni", { replace: true });
