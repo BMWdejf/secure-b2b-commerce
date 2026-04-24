@@ -3,9 +3,12 @@ import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
-
-const PASSWORD_RECOVERY_STORAGE_KEY = "password-recovery-ready";
+import {
+  cleanupRecoveryUrl,
+  establishRecoverySession,
+  getRecoveryPayloadFromUrl,
+  storeRecoveryPayload,
+} from "@/lib/auth/passwordRecovery";
 
 export default function AuthCallback() {
   const navigate = useNavigate();
@@ -18,49 +21,26 @@ export default function AuthCallback() {
 
     const finalize = async () => {
       const searchParams = new URLSearchParams(window.location.search);
-      const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
-
-      const code = searchParams.get("code");
-      const tokenHash = searchParams.get("token_hash") ?? hashParams.get("token_hash");
-      const type = searchParams.get("type") ?? hashParams.get("type");
-      const accessToken = hashParams.get("access_token");
-      const refreshToken = hashParams.get("refresh_token");
       const next = searchParams.get("next") || "/";
       const safeNext = next.startsWith("/") ? next : "/";
 
-      let sessionError: string | null = null;
+      const payload = getRecoveryPayloadFromUrl();
+      storeRecoveryPayload(payload);
 
-      if (code) {
-        const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
-        if (exchangeError) sessionError = exchangeError.message;
-      } else if (tokenHash && type) {
-        const { error: verifyError } = await supabase.auth.verifyOtp({
-          token_hash: tokenHash,
-          type: type as "recovery" | "email_change" | "signup" | "invite" | "email",
-        });
-        if (verifyError) sessionError = verifyError.message;
-      } else if (accessToken && refreshToken) {
-        const { error: setSessionError } = await supabase.auth.setSession({
-          access_token: accessToken,
-          refresh_token: refreshToken,
-        });
-        if (setSessionError) sessionError = setSessionError.message;
-      }
+      const result = await establishRecoverySession(payload);
 
-      for (let attempt = 0; attempt < 12; attempt += 1) {
-        const { data } = await supabase.auth.getSession();
-        if (data.session) {
-          if (type === "recovery" || safeNext === "/reset-password") {
-            window.sessionStorage.setItem(PASSWORD_RECOVERY_STORAGE_KEY, "1");
-          }
+      if (result.ok) {
+        cleanupRecoveryUrl(safeNext);
+        window.setTimeout(() => {
           navigate(safeNext, { replace: true });
-          return;
-        }
-
-        await new Promise((resolve) => window.setTimeout(resolve, 250));
+        }, 1000);
+        return;
       }
 
-      setError(sessionError ?? "Nepodařilo se ověřit odkaz. Požádejte prosím o nový.");
+      setTimeout(() => {
+        navigate("/reset-password", { replace: true });
+      }, 1000);
+      setError("Nepodařilo se ověřit odkaz automaticky. Zkouším otevřít formulář pro změnu hesla.");
     };
 
     void finalize();
