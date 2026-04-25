@@ -95,13 +95,14 @@ const App = () => (
                   <Route path="objednavky" element={<AdminOrders />} />
                   <Route path="objednavky/:id" element={<AdminOrderDetail />} />
                   <Route path="statistiky" element={<AdminStats />} />
-                  <Route path="nastaveni" element={<Placeholder title="Nastavení" description="Bude doplněno později." />} />
+                  <Route path="nastaveni" element={<AdminSettings />} />
                 </Route>
 
                 <Route path="*" element={<NotFound />} />
               </Route>
             </Routes>
           </CartProvider>
+          </SiteSettingsProvider>
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
