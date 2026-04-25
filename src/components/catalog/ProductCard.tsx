@@ -2,9 +2,10 @@ import { Link } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Lock, Package } from "lucide-react";
+import { Lock, Package, CheckCircle2, Clock } from "lucide-react";
 import type { Product } from "@/lib/api/catalog";
 import { useAuth } from "@/contexts/AuthContext";
+import { useSiteSettings } from "@/contexts/SiteSettingsContext";
 
 interface Props {
   product: Product;
@@ -12,7 +13,10 @@ interface Props {
 
 export function ProductCard({ product }: Props) {
   const { user, isApproved } = useAuth();
+  const { settings } = useSiteSettings();
   const showPricing = !!user && isApproved;
+  const inStock = product.availability === "in_stock";
+  const packLabel = product.pack_label || settings?.default_pack_label || "Karton";
 
   return (
     <Card className="group flex flex-col overflow-hidden border-border/60 transition-all hover:-translate-y-1 hover:shadow-elegant">
