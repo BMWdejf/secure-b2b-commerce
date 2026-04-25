@@ -30,7 +30,7 @@ export default function Contact() {
   useEffect(() => {
     if (user?.email) setEmail(user.email);
     if (profile?.full_name) setName(profile.full_name);
-    if (profile?.phone) setPhone(profile.phone);
+    if (profile && (profile as any).phone) setPhone((profile as any).phone);
   }, [user, profile]);
 
   const handleSubmit = async (e: React.FormEvent) => {
