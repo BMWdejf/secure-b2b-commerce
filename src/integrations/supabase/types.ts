@@ -188,6 +188,87 @@ export type Database = {
           },
         ]
       }
+      contact_addresses: {
+        Row: {
+          city: string | null
+          company_name: string
+          country: string
+          created_at: string
+          dic: string | null
+          email: string | null
+          ico: string | null
+          id: string
+          kind: Database["public"]["Enums"]["contact_address_kind"]
+          phone: string | null
+          postal_code: string | null
+          street: string | null
+          updated_at: string
+        }
+        Insert: {
+          city?: string | null
+          company_name?: string
+          country?: string
+          created_at?: string
+          dic?: string | null
+          email?: string | null
+          ico?: string | null
+          id?: string
+          kind: Database["public"]["Enums"]["contact_address_kind"]
+          phone?: string | null
+          postal_code?: string | null
+          street?: string | null
+          updated_at?: string
+        }
+        Update: {
+          city?: string | null
+          company_name?: string
+          country?: string
+          created_at?: string
+          dic?: string | null
+          email?: string | null
+          ico?: string | null
+          id?: string
+          kind?: Database["public"]["Enums"]["contact_address_kind"]
+          phone?: string | null
+          postal_code?: string | null
+          street?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      contact_messages: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          is_read: boolean
+          message: string
+          name: string
+          phone: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+          is_read?: boolean
+          message: string
+          name: string
+          phone?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          is_read?: boolean
+          message?: string
+          name?: string
+          phone?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       inventory: {
         Row: {
           low_stock_threshold: number
@@ -324,6 +405,36 @@ export type Database = {
         }
         Relationships: []
       }
+      pages: {
+        Row: {
+          content_html: string
+          created_at: string
+          id: string
+          is_published: boolean
+          slug: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          content_html?: string
+          created_at?: string
+          id?: string
+          is_published?: boolean
+          slug: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          content_html?: string
+          created_at?: string
+          id?: string
+          is_published?: boolean
+          slug?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       pricelist_items: {
         Row: {
           created_at: string
@@ -439,6 +550,7 @@ export type Database = {
       }
       products: {
         Row: {
+          availability: Database["public"]["Enums"]["product_availability"]
           category_id: string | null
           created_at: string
           description: string | null
@@ -447,6 +559,7 @@ export type Database = {
           main_image_url: string | null
           moq: number
           name: string
+          pack_label: string
           pack_size: number
           short_description: string | null
           sku: string | null
@@ -456,6 +569,7 @@ export type Database = {
           weight_kg: number | null
         }
         Insert: {
+          availability?: Database["public"]["Enums"]["product_availability"]
           category_id?: string | null
           created_at?: string
           description?: string | null
@@ -464,6 +578,7 @@ export type Database = {
           main_image_url?: string | null
           moq?: number
           name: string
+          pack_label?: string
           pack_size?: number
           short_description?: string | null
           sku?: string | null
@@ -473,6 +588,7 @@ export type Database = {
           weight_kg?: number | null
         }
         Update: {
+          availability?: Database["public"]["Enums"]["product_availability"]
           category_id?: string | null
           created_at?: string
           description?: string | null
@@ -481,6 +597,7 @@ export type Database = {
           main_image_url?: string | null
           moq?: number
           name?: string
+          pack_label?: string
           pack_size?: number
           short_description?: string | null
           sku?: string | null
@@ -537,6 +654,93 @@ export type Database = {
           },
         ]
       }
+      site_settings: {
+        Row: {
+          availability_in_stock_label: string
+          availability_on_request_label: string
+          brand_name: string
+          company_dic: string | null
+          company_ico: string | null
+          created_at: string
+          cta_button: string
+          cta_text: string
+          cta_title: string
+          default_pack_label: string
+          features: Json
+          features_subtitle: string
+          features_title: string
+          footer_text: string
+          hero_badge: string
+          hero_cta_primary: string
+          hero_cta_secondary: string
+          hero_note: string
+          hero_stats: Json
+          hero_subtitle: string
+          hero_title: string
+          hero_title_accent: string
+          id: string
+          is_singleton: boolean
+          logo_url: string | null
+          updated_at: string
+        }
+        Insert: {
+          availability_in_stock_label?: string
+          availability_on_request_label?: string
+          brand_name?: string
+          company_dic?: string | null
+          company_ico?: string | null
+          created_at?: string
+          cta_button?: string
+          cta_text?: string
+          cta_title?: string
+          default_pack_label?: string
+          features?: Json
+          features_subtitle?: string
+          features_title?: string
+          footer_text?: string
+          hero_badge?: string
+          hero_cta_primary?: string
+          hero_cta_secondary?: string
+          hero_note?: string
+          hero_stats?: Json
+          hero_subtitle?: string
+          hero_title?: string
+          hero_title_accent?: string
+          id?: string
+          is_singleton?: boolean
+          logo_url?: string | null
+          updated_at?: string
+        }
+        Update: {
+          availability_in_stock_label?: string
+          availability_on_request_label?: string
+          brand_name?: string
+          company_dic?: string | null
+          company_ico?: string | null
+          created_at?: string
+          cta_button?: string
+          cta_text?: string
+          cta_title?: string
+          default_pack_label?: string
+          features?: Json
+          features_subtitle?: string
+          features_title?: string
+          footer_text?: string
+          hero_badge?: string
+          hero_cta_primary?: string
+          hero_cta_secondary?: string
+          hero_note?: string
+          hero_stats?: Json
+          hero_subtitle?: string
+          hero_title?: string
+          hero_title_accent?: string
+          id?: string
+          is_singleton?: boolean
+          logo_url?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -581,6 +785,7 @@ export type Database = {
     Enums: {
       address_kind: "billing" | "shipping"
       app_role: "admin" | "client"
+      contact_address_kind: "billing" | "shipping"
       order_status:
         | "new"
         | "confirmed"
@@ -588,6 +793,7 @@ export type Database = {
         | "shipped"
         | "completed"
         | "cancelled"
+      product_availability: "in_stock" | "on_request"
       profile_status: "pending" | "approved" | "blocked"
     }
     CompositeTypes: {
@@ -718,6 +924,7 @@ export const Constants = {
     Enums: {
       address_kind: ["billing", "shipping"],
       app_role: ["admin", "client"],
+      contact_address_kind: ["billing", "shipping"],
       order_status: [
         "new",
         "confirmed",
@@ -726,6 +933,7 @@ export const Constants = {
         "completed",
         "cancelled",
       ],
+      product_availability: ["in_stock", "on_request"],
       profile_status: ["pending", "approved", "blocked"],
     },
   },
