@@ -1,111 +1,117 @@
+## Plán prací
 
+Plán řeší opravy + velký rozsah CMS funkcí. Doporučuji rozdělit na 2 fáze (níže), abychom dodali kvalitně a postupně.
 
-# B2B E-commerce platforma — finální plán (MVP v Lovable)
+---
 
-Postavíme moderní responzivní B2B e-shop s Lovable stackem. Backend (DB + Auth) na **Lovable Cloud (Supabase)** — díky tomu bude možné později frontend přepsat do Next.js a používat **stejnou Supabase databázi a auth**, bez migrace dat.
+### FÁZE A — Opravy (rychlé, dělám hned po schválení)
 
-## Role
+**1. Košík se neplní (`/produkt/...` → `/ucet/kosik` zůstává prázdný)**
 
-- **Host** — vidí katalog a popisy. Místo ceny/skladu výzva „Pro zobrazení cen se přihlaste".
-- **Klient (B2B)** — po **schválení adminem** vidí ceny dle svého ceníku, sklad, objednává.
-- **Admin** — plná správa katalogu, klientů, ceníků, objednávek, faktur, statistik.
+Příčina: `add()` v `CartContext` přidá položku, ale `qty` v detailu produktu defaultuje na `1`, zatímco MOQ produktu je 30 → pravděpodobně backend vloží `qty=1` (RLS to povolí) ale problém je jinde — `useEffect` v `CartProvider` se spouští dříve než je `user` k dispozici, a `refresh()` se po `add()` volá, ale `fetchCart` filtruje `r.product` (musí existovat join). Ověřím dotazem přímo do DB, zda se řádky vkládají, a opravím zdroj. Zároveň:
+- v `ProductDetail.tsx` inicializuji `qty` na `product.moq` (ne `1`),
+- po `add()` zavolám `refresh()` (už je tam) a navíc invaliduji cache,
+- zajistím, že `qty` posílaná do `addToCart` není menší než `MOQ`.
 
-## Veřejná část
+**2. `/reset-password` — tlačítko neukládá heslo**
 
-- Homepage (hero, výhody B2B, kategorie, CTA registrace).
-- Katalog: kategorie/podkategorie, filtry, vyhledávání, řazení, stránkování.
-- Detail produktu: galerie, popis, parametry, varianty, MOQ, ks/karton — bez ceny pro hosta.
-- Registrace B2B (IČO, DIČ, firma, kontakt, adresa) → stav „Čeká na schválení".
-- Login, zapomenuté heslo, vlastní stránka `/reset-password`.
+Aktuální tok je překomplikovaný. Zjednodušíme:
+- `ForgotPassword` pošle `redirectTo: /auth/callback?next=/reset-password` (Supabase generuje PKCE `code` link).
+- `AuthCallback` zavolá `supabase.auth.exchangeCodeForSession(code)` — to je oficiální způsob — a teprve po úspěchu naviguje na `/reset-password`.
+- `ResetPassword` pouze zkontroluje aktivní session a zavolá `supabase.auth.updateUser({ password })`. Žádné polling, žádné `sessionStorage` flagy.
+- Tlačítko aktivní hned, jakmile jsou hesla validní + shodují se + je session.
 
-## Klientská zóna
+**3. Detail produktu — množství defaultuje na 1**
 
-- Dashboard (poslední objednávky, rychlé akce).
-- Košík + checkout (bez platby — vytvoří objednávku k fakturaci, e-mail potvrzení).
-- Moje objednávky (stavy, detail, „Objednat znovu").
-- Faktury (PDF nahrané adminem, stav, splatnost).
-- Adresy a fakturační údaje (více dodacích adres).
-- Profil + změna hesla.
+Inicializuji `useState(product.moq)` (resp. po načtení produktu).
 
-Klient ve stavu *pending* vidí pouze oznámení o čekání na schválení.
+---
 
-## Admin dashboard `/admin`
+### FÁZE B — Nové funkce (CMS, vzhled, stránky, kontakt)
 
-- **Přehled** — KPI dlaždice, grafy tržeb, top produkty/klienti, fronta čekajících registrací.
-- **Produkty** — CRUD, varianty, atributy, obrázky (Storage), MOQ, ks/karton, sklad, aktivní/neaktivní.
-- **Kategorie** — strom 2 úrovní, řazení.
-- **Ceníky** — hlavní ceník + individuální ceníky pro klienty, množstevní slevy.
-- **Klienti** — schválení/zamítnutí, detail, přiřazení ceníku, blokace, historie.
-- **Objednávky** — filtry, změna stavu, interní poznámky, nahrání PDF faktury, export CSV.
-- **Statistiky** — tržby (období/klient/kategorie), top produkty/klienti.
-- **Nastavení** — firma, e-maily, prahy skladů.
+**Databázové změny (migrace):**
 
-## Design
+1. `products` — přidat:
+   - `availability` enum `'in_stock' | 'on_request'` (default `'in_stock'`)
+   - `pack_label` text (default `'Karton'`) — editovatelný název balení
+   - odebrat zobrazení `moq` z UI (sloupec necháme v DB pro budoucí použití)
 
-Moderní, profesionální B2B vzhled: neutrální paleta + jedna akcentní barva, jasná typografie, dostatek prostoru, jemné stíny. Vše přes design-system tokeny v `index.css` (HSL) a tailwind tokens, žádné hardcoded barvy v komponentách. shadcn/ui (Card, Table, Tabs, Dialog, Form, Sidebar, Toast, Skeleton). Mobilní first — collapsible sidebary, filter drawer, grid/list toggle.
+2. `site_settings` (singleton, 1 řádek) — KV pro vzhled:
+   - `logo_url`, `footer_text`, `company_ico`, `company_dic`
+   - `hero_title`, `hero_subtitle`, `hero_cta_text`, `hero_badge`
+   - `hero_stats` jsonb (4 položky label/value)
+   - `cta_title`, `cta_text`
+   - `features` jsonb (pole 6 karet)
+   - admin: `UPDATE` pro admin role; veřejně: `SELECT`
 
-## Technický stack a budoucí Next.js
+3. `pages` (CMS stránky) — `id`, `slug` (unique), `title`, `content_html`, `is_published`, `updated_at`
+   - veřejné `SELECT` jen `is_published=true`, admin `ALL`
+   - seed: `o-nas`, `kontakt`
 
-- **Frontend:** React 18 + Vite + TS + Tailwind + shadcn/ui + react-router-dom + TanStack Query + react-hook-form + zod.
-- **Backend:** Lovable Cloud (Supabase) — Postgres + Auth + Storage + Edge Functions.
-- **Migrace na Next.js později:** Supabase má první-tříd Next.js SDK (`@supabase/ssr`). Stačí vytvořit nový Next.js projekt a připojit ho ke **stejné Supabase instanci**. Přenášet se bude jen UI vrstva, ne data ani auth. Aby byla migrace hladká, držíme tyto pravidla:
-  - Veškerá business logika v **Postgres funkcích / RLS / Edge Functions**, ne v UI.
-  - Datové dotazy izolované v `src/lib/api/*` (jeden soubor na doménu) — v Next.js přepíšete jen tuhle vrstvu na server components.
-  - Žádné Vite-specific API v komponentách (žádné `import.meta.glob` apod.).
-  - Routy pojmenované česky a stabilně — stejnou strukturu pak nasadíš v `app/` Next.js routeru.
+4. `contact_addresses` (fakturační/dodací do patičky a kontaktů) — `id`, `kind` (`billing`/`shipping`), `company_name`, `street`, `city`, `postal_code`, `country`, `ico`, `dic`, `phone`, `email`
+   - admin `ALL`, veřejné `SELECT`
 
-## Datový model (zjednodušeně)
+5. `contact_messages` — zprávy z kontaktního formuláře:
+   - `id`, `name`, `email`, `phone`, `message`, `user_id` (nullable), `is_read`, `created_at`
+   - veřejně `INSERT` (s rate limitem v kódu), admin `SELECT/UPDATE/DELETE`
 
-`profiles` (link na auth.users, status pending|approved|blocked, company_id) · `user_roles` (separátní, role admin|client) · `companies` (IČO, DIČ, název, pricelist_id) · `addresses` · `categories` (parent_id) · `products` · `product_variants` · `product_images` · `inventory` · `pricelists` + `pricelist_items` (pásma) · `orders` + `order_items` (snímek ceny) · `invoices`.
+6. Storage bucket `branding` (public) — pro logo.
 
-## Bezpečnost (kritické)
+**Admin → Nastavení (`/admin/nastaveni`):**
 
-- RLS zapnuté na všech tabulkách.
-- Role v **samostatné `user_roles`** tabulce + `has_role()` security-definer funkce (žádná rekurze, žádný privilege escalation).
-- Klient vidí jen data své `company_id`. Admin přes `has_role(auth.uid(),'admin')`.
-- **Ceny a sklad:** RLS politiky vyžadují přihlášení + `status='approved'`. Host nedostane řádek z `pricelist_items` ani `inventory`.
-- Vstupy validované přes **zod** (klient) + omezení v DB (server).
-- Vlastní `/reset-password` stránka pro Supabase recovery link.
+Vytvořím novou stránku s taby:
+- **Vzhled**
+  - upload loga (do `branding` bucketu) → uloží `logo_url` do `site_settings`
+  - editace `footer_text`, IČO, DIČ
+  - editace celé hlavní stránky: hero (title/subtitle/CTA/badge), 4 statistiky, 6 feature karet, CTA sekce
+- **Produkty** (vzhled)
+  - výchozí `pack_label` ("Karton"/"Balení"/"Role"…)
+  - správa statusů dostupnosti (zatím pevné 2: Skladem / Na dotaz — možno přejmenovat texty zobrazované na webu)
+- **Stránky**
+  - seznam stránek + tlačítko "Nová stránka"
+  - editor: slug, název, WYSIWYG obsah (TipTap), publikováno ano/ne
+- **Kontakty/Adresy**
+  - fakturační a dodací adresa firmy → propsáno do `/kontakt`
+- **Zprávy a dotazy**
+  - inbox z `contact_messages`, označit přečtené, smazat
 
-## Routing
+**Admin → Produkty (form):**
+- pole `availability` (select: Skladem / Na dotaz)
+- pole `pack_label` (text, default z `site_settings`)
+- odstranit `MOQ` z UI (skrýt, needitovat)
 
-```text
-/                       Home
-/katalog                Katalog
-/produkt/:slug          Detail
-/prihlaseni             Login
-/registrace             Registrace B2B
-/reset-password         Reset hesla
-/ucet                   Klientský dashboard
-  /ucet/objednavky
-  /ucet/faktury
-  /ucet/adresy
-  /ucet/profil
-/kosik, /pokladna       Košík + checkout
-/admin                  Admin dashboard
-  /admin/produkty
-  /admin/kategorie
-  /admin/ceniky
-  /admin/klienti
-  /admin/objednavky
-  /admin/statistiky
-  /admin/nastaveni
-```
+**Veřejný web:**
 
-## Postup po fázích
+- `ProductDetail.tsx`:
+  - karta specifikací: `Jednotka`, `Dostupnost` (badge zelená/oranžová), `<pack_label>` (např. "Karton 30 m"), `Hmotnost`
+  - **odstranit** MOQ
+  - `qty` default = `pack_size`, krok = `pack_size`
+- `ProductCard.tsx`: zobrazit badge dostupnosti, použít `pack_label` místo "Karton"
+- `Index.tsx`: číst hero/features/CTA z `site_settings`
+- `PublicHeader.tsx`: pokud je `logo_url` nastaveno, zobrazit ho místo "N"
+- `PublicFooter.tsx`: logo z settings, `footer_text`, IČO/DIČ z settings
+- `/kontakt`: nová stránka místo Placeholder
+  - zobrazí fakturační + dodací adresu
+  - kontaktní formulář (zod validace): `name*`, `email*` (auto-fill z profilu když přihlášen), `phone`, `message*`, tlačítko Odeslat
+  - uloží do `contact_messages`
+- `/o-nas` + jakékoliv další stránky: dynamicky z `pages` tabulky (route `/:slug` jako fallback)
 
-Po každé fázi uvidíš funkční výsledek. Další fázi spustíš krátkou zprávou („pokračuj fází 2").
+**WYSIWYG editor:** TipTap (`@tiptap/react`, `@tiptap/starter-kit`) — moderní, lehký, dobře integrovatelný.
 
-1. **Fáze 1 — Základ + Auth + Layout**
-   Design system, veřejný layout (header/footer), home, registrace B2B se schvalováním, login, reset hesla, role + RLS, chráněné prázdné stránky `/ucet` a `/admin`.
-2. **Fáze 2 — Veřejný katalog**
-   Kategorie, produkty, detail, vyhledávání/filtry. Ceny/sklad skryté pro hosta.
-3. **Fáze 3 — Admin: produkty, kategorie, klienti, ceníky**
-   CRUD, obrázky, schvalování klientů, individuální ceníky.
-4. **Fáze 4 — Klientská zóna + objednávky**
-   Ceny dle ceníku, košík, checkout, moje objednávky, adresy, profil.
-5. **Fáze 5 — Admin objednávky + faktury + statistiky**
-   Správa objednávek, nahrávání PDF faktur, KPI a grafy.
+---
 
-Po schválení tohoto plánu spustíme **Fázi 1**.
+### Technické poznámky
 
+- Všechny nové tabulky budou mít RLS (admin ALL, veřejné SELECT kde dává smysl).
+- `site_settings` vytvořím s jedním řádkem (`id` fixní UUID) a všude budu `upsert`.
+- `pack_label` se vyplní z aktuální hodnoty produktu, fallback na výchozí ze `site_settings`.
+- Kontaktní formulář: validace zod, `INSERT` přes anon key (RLS povolí pouze insert, žádné read).
+- Logo upload: max 2 MB, `image/*`, do `branding/logo.{ext}`.
+
+---
+
+### Pořadí dodání
+
+Nejdřív FÁZI A (3 opravy + 1 migrace pro `availability` + `pack_label`), pak FÁZI B (CMS, settings, stránky, kontakt, zprávy). Pokud chcete vše naráz, udělám to v jedné dávce — bude to ale větší změna.
+
+**Otázka před spuštěním:** Mám pokračovat **vším naráz (A+B)**, nebo nejprve dodat **FÁZI A** a teprve po vašem otestování spustit **FÁZI B**?

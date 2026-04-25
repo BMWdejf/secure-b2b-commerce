@@ -8,16 +8,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { AlertCircle, CheckCircle2, Circle, Loader2 } from "lucide-react";
-import {
-  cleanupRecoveryUrl,
-  clearRecoveryState,
-  establishRecoverySession,
-  getRecoveryPayloadFromUrl,
-  hasRecoveryPayload,
-  isRecoveryReadyFlagSet,
-  markRecoveryReady,
-  storeRecoveryPayload,
-} from "@/lib/auth/passwordRecovery";
 
 const schema = z
   .object({
@@ -31,8 +21,7 @@ export default function ResetPassword() {
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [loading, setLoading] = useState(false);
-  const [recoveryReady, setRecoveryReady] = useState<boolean | null>(null);
-  const [recoveryError, setRecoveryError] = useState<string | null>(null);
+  const [hasSession, setHasSession] = useState<boolean | null>(null);
 
   const passwordChecks = useMemo(
     () => [
@@ -45,47 +34,75 @@ export default function ResetPassword() {
     [password],
   );
 
-  const strongPassword = passwordChecks.every((check) => check.ok);
+  const strongPassword = passwordChecks.every((c) => c.ok);
   const passwordsMatch = confirm.length > 0 && password === confirm;
 
   useEffect(() => {
-    let active = true;
+    let cancelled = false;
 
-    const resolve = async () => {
-      const payload = getRecoveryPayloadFromUrl();
-      if (hasRecoveryPayload(payload)) {
-        storeRecoveryPayload(payload);
-      }
-
-      const result = await establishRecoverySession(hasRecoveryPayload(payload) ? payload : null);
-
-      if (!active) return;
-
-      if (result.ok || isRecoveryReadyFlagSet()) {
-        markRecoveryReady();
-        cleanupRecoveryUrl("/reset-password");
-        setRecoveryError(null);
-        setRecoveryReady(true);
+    const tryEstablish = async () => {
+      // 1. Try existing session
+      const { data: existing } = await supabase.auth.getSession();
+      if (existing.session) {
+        if (!cancelled) setHasSession(true);
         return;
       }
 
-      setRecoveryReady(false);
-      setRecoveryError("Resetovací odkaz není aktivní. Otevřete prosím nejnovější odkaz z e-mailu.");
+      // 2. PKCE code in query
+      const url = new URL(window.location.href);
+      const code = url.searchParams.get("code");
+      if (code) {
+        const { error } = await supabase.auth.exchangeCodeForSession(code);
+        if (!cancelled) {
+          if (!error) {
+            setHasSession(true);
+            window.history.replaceState({}, "", "/reset-password");
+            return;
+          }
+        }
+      }
+
+      // 3. token_hash (recovery)
+      const tokenHash = url.searchParams.get("token_hash");
+      const type = url.searchParams.get("type");
+      if (tokenHash && (type === "recovery" || !type)) {
+        const { error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type: "recovery" });
+        if (!cancelled) {
+          if (!error) {
+            setHasSession(true);
+            window.history.replaceState({}, "", "/reset-password");
+            return;
+          }
+        }
+      }
+
+      // 4. Hash (#access_token)
+      const hash = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+      const at = hash.get("access_token");
+      const rt = hash.get("refresh_token");
+      if (at && rt) {
+        const { error } = await supabase.auth.setSession({ access_token: at, refresh_token: rt });
+        if (!cancelled) {
+          if (!error) {
+            setHasSession(true);
+            window.history.replaceState({}, "", "/reset-password");
+            return;
+          }
+        }
+      }
+
+      if (!cancelled) setHasSession(false);
     };
 
-    const { data: subscription } = supabase.auth.onAuthStateChange((event, session) => {
-      if ((isRecoveryReadyFlagSet() || event === "PASSWORD_RECOVERY") && session) {
-        markRecoveryReady();
-        setRecoveryError(null);
-        setRecoveryReady(true);
-      }
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session && !cancelled) setHasSession(true);
     });
 
-    void resolve();
+    void tryEstablish();
 
     return () => {
-      active = false;
-      subscription.subscription.unsubscribe();
+      cancelled = true;
+      sub.subscription.unsubscribe();
     };
   }, []);
 
@@ -96,40 +113,19 @@ export default function ResetPassword() {
       toast.error(parsed.error.issues[0].message);
       return;
     }
-    if (!strongPassword) {
-      toast.error("Zvolte silnější heslo podle uvedených pravidel");
-      return;
-    }
-
-    if (!passwordsMatch) {
-      toast.error("Obě hesla se musí shodovat");
-      return;
-    }
-
     setLoading(true);
-
-    const recovered = await establishRecoverySession();
-    const { data: sessionData } = await supabase.auth.getSession();
-
-    if (!recovered.ok || !sessionData.session) {
-      setLoading(false);
-      setRecoveryReady(false);
-      setRecoveryError("Nepodařilo se ověřit resetovací odkaz. Požádejte prosím o nový.");
-      toast.error("Resetovací odkaz už není platný. Požádejte o nový.");
-      return;
-    }
-
     const { error } = await supabase.auth.updateUser({ password: parsed.data.password });
     setLoading(false);
     if (error) {
       toast.error(error.message);
       return;
     }
-    clearRecoveryState();
     toast.success("Heslo bylo změněno. Můžete se přihlásit.");
     await supabase.auth.signOut();
     navigate("/prihlaseni", { replace: true });
   };
+
+  const canSubmit = hasSession === true && strongPassword && passwordsMatch && !loading;
 
   return (
     <div className="container flex min-h-[calc(100vh-4rem)] items-center justify-center py-12">
@@ -139,70 +135,55 @@ export default function ResetPassword() {
           <CardDescription>Zadejte si prosím nové heslo</CardDescription>
         </CardHeader>
         <CardContent>
-          {recoveryReady === null ? (
+          {hasSession === null ? (
             <div className="flex justify-center py-6">
               <Loader2 className="h-6 w-6 animate-spin text-primary" />
             </div>
+          ) : hasSession === false ? (
+            <div className="space-y-4">
+              <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+                Odkaz pro reset hesla je neplatný nebo vypršel. Požádejte o nový.
+              </div>
+              <Button asChild className="w-full">
+                <Link to="/zapomenute-heslo">Požádat o nový odkaz</Link>
+              </Button>
+            </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-4">
-              {recoveryReady === false ? (
-                <div className="rounded-md border border-input bg-muted/30 p-3 text-sm text-muted-foreground">
-                  {recoveryError ?? "Recovery relace zatím není aktivní. Otevřete prosím nejnovější odkaz z e-mailu."}
-                </div>
-              ) : null}
               <div className="space-y-2">
                 <Label htmlFor="password">Nové heslo</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  autoComplete="new-password"
-                  required
-                />
+                <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" required />
               </div>
+
               <div className="space-y-2 rounded-md border border-input bg-muted/20 p-3">
                 <p className="text-sm font-medium">Síla hesla</p>
                 <ul className="space-y-2 text-sm">
                   {passwordChecks.map((check) => (
-                    <li
-                      key={check.label}
-                      className={check.ok ? "flex items-center gap-2 text-success" : "flex items-center gap-2 text-muted-foreground"}
-                    >
+                    <li key={check.label} className={check.ok ? "flex items-center gap-2 text-success" : "flex items-center gap-2 text-muted-foreground"}>
                       {check.ok ? <CheckCircle2 className="h-4 w-4 text-success" /> : <Circle className="h-4 w-4" />}
                       <span>{check.label}</span>
                     </li>
                   ))}
                 </ul>
               </div>
+
               <div className="space-y-2">
                 <Label htmlFor="confirm">Heslo znovu</Label>
-                <Input
-                  id="confirm"
-                  type="password"
-                  value={confirm}
-                  onChange={(e) => setConfirm(e.target.value)}
-                  autoComplete="new-password"
-                  required
-                />
-                {confirm.length > 0 ? (
+                <Input id="confirm" type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} autoComplete="new-password" required />
+                {confirm.length > 0 && (
                   <div className={passwordsMatch ? "flex items-center gap-2 text-sm text-success" : "flex items-center gap-2 text-sm text-destructive"}>
-                    {passwordsMatch ? <CheckCircle2 className="h-4 w-4 text-success" /> : <AlertCircle className="h-4 w-4 text-destructive" />}
+                    {passwordsMatch ? <CheckCircle2 className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}
                     <span>{passwordsMatch ? "Hesla se shodují" : "Hesla se neshodují"}</span>
                   </div>
-                ) : null}
+                )}
               </div>
-              <Button type="submit" className="w-full" disabled={loading || recoveryReady !== true || !strongPassword || !passwordsMatch}>
+
+              <Button type="submit" className="w-full" disabled={!canSubmit}>
                 {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                 Nastavit nové heslo
               </Button>
             </form>
           )}
-          {recoveryReady === false ? (
-            <Button asChild variant="outline" className="mt-4 w-full">
-              <Link to="/zapomenute-heslo">Požádat o nový odkaz</Link>
-            </Button>
-          ) : null}
         </CardContent>
       </Card>
     </div>

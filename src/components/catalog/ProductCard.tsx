@@ -2,9 +2,10 @@ import { Link } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Lock, Package } from "lucide-react";
+import { Lock, Package, CheckCircle2, Clock } from "lucide-react";
 import type { Product } from "@/lib/api/catalog";
 import { useAuth } from "@/contexts/AuthContext";
+import { useSiteSettings } from "@/contexts/SiteSettingsContext";
 
 interface Props {
   product: Product;
@@ -12,7 +13,10 @@ interface Props {
 
 export function ProductCard({ product }: Props) {
   const { user, isApproved } = useAuth();
+  const { settings } = useSiteSettings();
   const showPricing = !!user && isApproved;
+  const inStock = product.availability === "in_stock";
+  const packLabel = product.pack_label || settings?.default_pack_label || "Karton";
 
   return (
     <Card className="group flex flex-col overflow-hidden border-border/60 transition-all hover:-translate-y-1 hover:shadow-elegant">
@@ -47,8 +51,16 @@ export function ProductCard({ product }: Props) {
         </Link>
 
         <div className="flex flex-wrap gap-1.5 text-[11px] text-muted-foreground">
-          <span className="rounded-md bg-secondary px-2 py-0.5">MOQ {product.moq} {product.unit}</span>
-          <span className="rounded-md bg-secondary px-2 py-0.5">Karton {product.pack_size}</span>
+          {inStock ? (
+            <span className="inline-flex items-center gap-1 rounded-md bg-success/10 px-2 py-0.5 text-success">
+              <CheckCircle2 className="h-3 w-3" /> {settings?.availability_in_stock_label ?? "Skladem"}
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1 rounded-md bg-warning/10 px-2 py-0.5 text-warning">
+              <Clock className="h-3 w-3" /> {settings?.availability_on_request_label ?? "Na dotaz"}
+            </span>
+          )}
+          <span className="rounded-md bg-secondary px-2 py-0.5">{packLabel} {product.pack_size} {product.unit}</span>
         </div>
 
         <div className="mt-auto flex items-center justify-between gap-2 border-t border-border/60 pt-3">

@@ -55,6 +55,8 @@ export interface AdminProduct {
   unit: string;
   moq: number;
   pack_size: number;
+  pack_label: string;
+  availability: "in_stock" | "on_request";
   weight_kg: number | null;
   main_image_url: string | null;
   is_active: boolean;
@@ -63,7 +65,7 @@ export interface AdminProduct {
 export async function adminListProducts(search?: string): Promise<AdminProduct[]> {
   let q = supabase
     .from("products")
-    .select("id, category_id, name, slug, sku, short_description, description, unit, moq, pack_size, weight_kg, main_image_url, is_active")
+    .select("id, category_id, name, slug, sku, short_description, description, unit, moq, pack_size, pack_label, availability, weight_kg, main_image_url, is_active")
     .order("created_at", { ascending: false })
     .limit(500);
   if (search?.trim()) {
@@ -78,7 +80,7 @@ export async function adminListProducts(search?: string): Promise<AdminProduct[]
 export async function adminGetProduct(id: string): Promise<AdminProduct | null> {
   const { data, error } = await supabase
     .from("products")
-    .select("id, category_id, name, slug, sku, short_description, description, unit, moq, pack_size, weight_kg, main_image_url, is_active")
+    .select("id, category_id, name, slug, sku, short_description, description, unit, moq, pack_size, pack_label, availability, weight_kg, main_image_url, is_active")
     .eq("id", id)
     .maybeSingle();
   if (error) throw error;
@@ -96,6 +98,8 @@ export async function adminUpsertProduct(p: Partial<AdminProduct> & { name: stri
     unit: p.unit ?? "ks",
     moq: p.moq ?? 1,
     pack_size: p.pack_size ?? 1,
+    pack_label: p.pack_label ?? "Karton",
+    availability: p.availability ?? "in_stock",
     weight_kg: p.weight_kg ?? null,
     main_image_url: p.main_image_url ?? null,
     is_active: p.is_active ?? true,
