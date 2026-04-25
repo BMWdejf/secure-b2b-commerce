@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { CartProvider } from "@/contexts/CartContext";
+import { SiteSettingsProvider } from "@/contexts/SiteSettingsContext";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import PublicLayout from "@/components/layout/PublicLayout";
 import Index from "./pages/Index";
@@ -36,6 +37,9 @@ import AdminStats from "./pages/admin/AdminStats";
 import Invoices from "./pages/account/Invoices";
 import Placeholder from "./pages/Placeholder";
 import NotFound from "./pages/NotFound";
+import Contact from "./pages/Contact";
+import CmsPage from "./pages/CmsPage";
+import AdminSettings from "./pages/admin/AdminSettings";
 
 const queryClient = new QueryClient();
 
@@ -46,6 +50,7 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <AuthProvider>
+          <SiteSettingsProvider>
           <CartProvider>
             <Routes>
               <Route element={<PublicLayout />}>
@@ -53,8 +58,9 @@ const App = () => (
                 <Route path="/" element={<Index />} />
                 <Route path="/katalog" element={<Catalog />} />
                 <Route path="/produkt/:slug" element={<ProductDetail />} />
-                <Route path="/o-nas" element={<Placeholder title="O nás" />} />
-                <Route path="/kontakt" element={<Placeholder title="Kontakt" />} />
+                <Route path="/o-nas" element={<CmsPage slugOverride="o-nas" />} />
+                <Route path="/kontakt" element={<Contact />} />
+                <Route path="/stranka/:slug" element={<CmsPage />} />
 
                 {/* Auth */}
                 <Route path="/prihlaseni" element={<Login />} />
