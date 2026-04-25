@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { fetchProductBySlug } from "@/lib/api/catalog";
@@ -7,15 +7,17 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { PriceGate } from "@/components/catalog/PriceGate";
-import { ChevronRight, Package, ShoppingCart, Minus, Plus } from "lucide-react";
+import { ChevronRight, Package, ShoppingCart, Minus, Plus, CheckCircle2, Clock } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCart } from "@/contexts/CartContext";
+import { useSiteSettings } from "@/contexts/SiteSettingsContext";
 import { Input } from "@/components/ui/input";
 
 export default function ProductDetail() {
   const { slug = "" } = useParams();
   const { user, isApproved } = useAuth();
   const { add } = useCart();
+  const { settings } = useSiteSettings();
   const [activeImage, setActiveImage] = useState(0);
   const [qty, setQty] = useState(1);
 
@@ -24,6 +26,14 @@ export default function ProductDetail() {
     queryFn: () => fetchProductBySlug(slug),
     enabled: !!slug,
   });
+
+  // Initialize qty to pack_size (or moq) when product loads
+  useEffect(() => {
+    if (data?.product) {
+      const initial = Math.max(data.product.pack_size || 1, data.product.moq || 1);
+      setQty(initial);
+    }
+  }, [data?.product?.id]);
 
   if (isLoading) {
     return (
@@ -59,7 +69,14 @@ export default function ProductDetail() {
       ? [{ id: "main", url: product.main_image_url, alt: product.name, sort_order: 0, is_primary: true }]
       : [];
 
-  const canOrder = !!user && isApproved;
+  const canOrder = !!user && isApproved && product.availability === "in_stock";
+  const inStock = product.availability === "in_stock";
+  const stepSize = product.pack_size || 1;
+  const minQty = Math.max(product.moq || 1, stepSize);
+  const packLabel = product.pack_label || settings?.default_pack_label || "Karton";
+
+  const inStockLabel = settings?.availability_in_stock_label ?? "Skladem";
+  const onRequestLabel = settings?.availability_on_request_label ?? "Na dotaz";
 
   return (
     <div className="container py-8 md:py-12">
@@ -105,7 +122,18 @@ export default function ProductDetail() {
 
         <div className="space-y-6">
           <div className="space-y-2">
-            {product.sku && <Badge variant="secondary">SKU: {product.sku}</Badge>}
+            <div className="flex flex-wrap items-center gap-2">
+              {product.sku && <Badge variant="secondary">SKU: {product.sku}</Badge>}
+              {inStock ? (
+                <Badge className="bg-success text-success-foreground hover:bg-success/90">
+                  <CheckCircle2 className="mr-1 h-3 w-3" /> {inStockLabel}
+                </Badge>
+              ) : (
+                <Badge variant="outline" className="border-warning/40 text-warning">
+                  <Clock className="mr-1 h-3 w-3" /> {onRequestLabel}
+                </Badge>
+              )}
+            </div>
             <h1 className="font-display text-3xl font-bold tracking-tight md:text-4xl">{product.name}</h1>
             {product.short_description && (
               <p className="text-lg text-muted-foreground">{product.short_description}</p>
@@ -114,10 +142,9 @@ export default function ProductDetail() {
 
           <PriceGate />
 
-          <Card className="grid grid-cols-2 gap-4 p-5 sm:grid-cols-4">
+          <Card className="grid grid-cols-3 gap-4 p-5">
             <Spec label="Jednotka" value={product.unit} />
-            <Spec label="MOQ" value={`${product.moq} ${product.unit}`} />
-            <Spec label="Karton" value={`${product.pack_size} ${product.unit}`} />
+            <Spec label={packLabel} value={`${product.pack_size} ${product.unit}`} />
             <Spec label="Hmotnost" value={product.weight_kg ? `${product.weight_kg} kg` : "—"} />
           </Card>
 
@@ -133,18 +160,18 @@ export default function ProductDetail() {
           <div className="flex flex-wrap items-center gap-3 border-t border-border pt-6">
             {canOrder && (
               <div className="flex items-center gap-1 rounded-md border border-border">
-                <Button size="icon" variant="ghost" onClick={() => setQty((q) => Math.max(product.moq, q - product.pack_size))}>
+                <Button size="icon" variant="ghost" onClick={() => setQty((q) => Math.max(minQty, q - stepSize))}>
                   <Minus className="h-4 w-4" />
                 </Button>
                 <Input
                   type="number"
-                  min={product.moq}
-                  step={product.pack_size}
+                  min={minQty}
+                  step={stepSize}
                   value={qty}
-                  onChange={(e) => setQty(Math.max(product.moq, parseInt(e.target.value || String(product.moq), 10)))}
-                  className="h-9 w-20 border-0 text-center focus-visible:ring-0"
+                  onChange={(e) => setQty(Math.max(minQty, parseInt(e.target.value || String(minQty), 10)))}
+                  className="h-9 w-24 border-0 text-center focus-visible:ring-0"
                 />
-                <Button size="icon" variant="ghost" onClick={() => setQty((q) => q + product.pack_size)}>
+                <Button size="icon" variant="ghost" onClick={() => setQty((q) => q + stepSize)}>
                   <Plus className="h-4 w-4" />
                 </Button>
               </div>
@@ -156,7 +183,13 @@ export default function ProductDetail() {
               className="bg-accent text-accent-foreground hover:bg-accent/90"
             >
               <ShoppingCart className="mr-2 h-4 w-4" />
-              {canOrder ? "Přidat do košíku" : "Objednávka po přihlášení"}
+              {!user
+                ? "Objednávka po přihlášení"
+                : !isApproved
+                  ? "Po schválení účtu"
+                  : !inStock
+                    ? "Nedostupné — kontaktujte nás"
+                    : "Přidat do košíku"}
             </Button>
             <Button size="lg" variant="outline" asChild>
               <Link to="/katalog">Zpět do katalogu</Link>
