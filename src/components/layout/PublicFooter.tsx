@@ -1,20 +1,26 @@
 import { Link } from "react-router-dom";
+import { useSiteSettings } from "@/contexts/SiteSettingsContext";
 
 export function PublicFooter() {
+  const { settings } = useSiteSettings();
+  const brand = settings?.brand_name ?? "NordB2B";
   return (
     <footer className="border-t border-border/60 bg-secondary/40">
       <div className="container py-12">
         <div className="grid gap-8 md:grid-cols-4">
           <div className="md:col-span-2">
             <Link to="/" className="flex items-center gap-2 font-display text-xl font-bold text-primary">
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-hero text-primary-foreground">
-                N
-              </div>
-              NordB2B
+              {settings?.logo_url ? (
+                <img src={settings.logo_url} alt={brand} className="h-9 w-auto" />
+              ) : (
+                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-hero text-primary-foreground">
+                  {brand.charAt(0)}
+                </div>
+              )}
+              {brand}
             </Link>
             <p className="mt-3 max-w-md text-sm text-muted-foreground">
-              Velkoobchodní platforma navržená pro moderní B2B partnery. Individuální ceníky,
-              rychlé objednávky, fakturace bez papírování.
+              {settings?.footer_text ?? "Velkoobchodní platforma navržená pro moderní B2B partnery."}
             </p>
           </div>
           <div>
@@ -34,8 +40,10 @@ export function PublicFooter() {
           </div>
         </div>
         <div className="mt-10 flex flex-col items-start justify-between gap-3 border-t border-border/60 pt-6 text-xs text-muted-foreground sm:flex-row">
-          <p>© {new Date().getFullYear()} NordB2B. Všechna práva vyhrazena.</p>
-          <p>IČO: 00000000 · DIČ: CZ00000000</p>
+          <p>© {new Date().getFullYear()} {brand}. Všechna práva vyhrazena.</p>
+          <p>
+            {settings?.company_ico ? `IČO: ${settings.company_ico}` : ""} {settings?.company_dic ? `· DIČ: ${settings.company_dic}` : ""}
+          </p>
         </div>
       </div>
     </footer>

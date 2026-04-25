@@ -1,6 +1,7 @@
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
+import { useSiteSettings } from "@/contexts/SiteSettingsContext";
 import { LogOut, User as UserIcon, ShieldCheck, Menu, X } from "lucide-react";
 import { useState } from "react";
 import { CartIcon } from "@/components/cart/CartIcon";
@@ -15,8 +16,10 @@ import {
 
 export function PublicHeader() {
   const { user, profile, isAdmin, signOut } = useAuth();
+  const { settings } = useSiteSettings();
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const brand = settings?.brand_name ?? "NordB2B";
 
   const handleSignOut = async () => {
     await signOut();
@@ -34,10 +37,14 @@ export function PublicHeader() {
     <header className="sticky top-0 z-40 w-full border-b border-border/60 bg-background/80 backdrop-blur-lg">
       <div className="container flex h-16 items-center justify-between gap-4">
         <Link to="/" className="flex items-center gap-2 font-display text-xl font-bold text-primary">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-hero text-primary-foreground shadow-soft">
-            N
-          </div>
-          NordB2B
+          {settings?.logo_url ? (
+            <img src={settings.logo_url} alt={brand} className="h-9 w-auto" />
+          ) : (
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-hero text-primary-foreground shadow-soft">
+              {brand.charAt(0)}
+            </div>
+          )}
+          {brand}
         </Link>
 
         <nav className="hidden items-center gap-1 md:flex">
