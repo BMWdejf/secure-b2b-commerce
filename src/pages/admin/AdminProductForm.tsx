@@ -34,6 +34,8 @@ export default function AdminProductForm() {
     unit: "ks",
     moq: 1,
     pack_size: 1,
+    pack_label: "Karton",
+    availability: "in_stock",
     is_active: true,
     category_id: null,
     main_image_url: null,
@@ -155,11 +157,11 @@ export default function AdminProductForm() {
                 <Input value={form.unit ?? "ks"} onChange={(e) => setForm((s) => ({ ...s, unit: e.target.value }))} />
               </div>
               <div className="space-y-2">
-                <Label>MOQ</Label>
-                <Input type="number" min={1} value={form.moq ?? 1} onChange={(e) => setForm((s) => ({ ...s, moq: Number(e.target.value) }))} />
+                <Label>Název balení</Label>
+                <Input placeholder="Karton / Balení / Role" value={form.pack_label ?? "Karton"} onChange={(e) => setForm((s) => ({ ...s, pack_label: e.target.value }))} />
               </div>
               <div className="space-y-2">
-                <Label>Karton</Label>
+                <Label>Velikost balení</Label>
                 <Input type="number" min={1} value={form.pack_size ?? 1} onChange={(e) => setForm((s) => ({ ...s, pack_size: Number(e.target.value) }))} />
               </div>
               <div className="space-y-2">
@@ -170,6 +172,19 @@ export default function AdminProductForm() {
                   value={form.weight_kg ?? ""}
                   onChange={(e) => setForm((s) => ({ ...s, weight_kg: e.target.value ? Number(e.target.value) : null }))}
                 />
+              </div>
+              <div className="col-span-2 space-y-2 sm:col-span-4">
+                <Label>Dostupnost</Label>
+                <Select
+                  value={form.availability ?? "in_stock"}
+                  onValueChange={(v) => setForm((s) => ({ ...s, availability: v as any }))}
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="in_stock">Skladem</SelectItem>
+                    <SelectItem value="on_request">Na dotaz</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </CardContent>
           </Card>
