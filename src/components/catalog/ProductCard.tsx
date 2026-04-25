@@ -51,8 +51,16 @@ export function ProductCard({ product }: Props) {
         </Link>
 
         <div className="flex flex-wrap gap-1.5 text-[11px] text-muted-foreground">
-          <span className="rounded-md bg-secondary px-2 py-0.5">MOQ {product.moq} {product.unit}</span>
-          <span className="rounded-md bg-secondary px-2 py-0.5">Karton {product.pack_size}</span>
+          {inStock ? (
+            <span className="inline-flex items-center gap-1 rounded-md bg-success/10 px-2 py-0.5 text-success">
+              <CheckCircle2 className="h-3 w-3" /> {settings?.availability_in_stock_label ?? "Skladem"}
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1 rounded-md bg-warning/10 px-2 py-0.5 text-warning">
+              <Clock className="h-3 w-3" /> {settings?.availability_on_request_label ?? "Na dotaz"}
+            </span>
+          )}
+          <span className="rounded-md bg-secondary px-2 py-0.5">{packLabel} {product.pack_size} {product.unit}</span>
         </div>
 
         <div className="mt-auto flex items-center justify-between gap-2 border-t border-border/60 pt-3">
