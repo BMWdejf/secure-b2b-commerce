@@ -77,9 +77,15 @@ export function CartProvider({ children }: { children: ReactNode }) {
       toast.error("Váš účet ještě nebyl schválen");
       return;
     }
-    await apiAdd(user.id, productId, qty);
-    await refresh();
-    toast.success("Přidáno do košíku");
+    const safeQty = Math.max(1, Math.floor(qty || 1));
+    try {
+      await apiAdd(user.id, productId, safeQty);
+      await refresh();
+      toast.success("Přidáno do košíku");
+    } catch (e: any) {
+      console.error("Add to cart failed", e);
+      toast.error(e?.message ?? "Položku se nepodařilo přidat do košíku");
+    }
   };
 
   const setQty = async (itemId: string, qty: number) => {
