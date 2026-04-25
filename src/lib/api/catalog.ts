@@ -9,6 +9,8 @@ export interface Category {
   sort_order: number;
 }
 
+export type ProductAvailability = "in_stock" | "on_request";
+
 export interface Product {
   id: string;
   category_id: string | null;
@@ -20,6 +22,8 @@ export interface Product {
   unit: string;
   moq: number;
   pack_size: number;
+  pack_label: string;
+  availability: ProductAvailability;
   weight_kg: number | null;
   main_image_url: string | null;
 }
@@ -51,7 +55,7 @@ export interface ProductFilters {
 export async function fetchProducts(filters: ProductFilters = {}): Promise<Product[]> {
   let query = supabase
     .from("products")
-    .select("id, category_id, name, slug, sku, short_description, description, unit, moq, pack_size, weight_kg, main_image_url, categories!inner(slug, is_active)")
+    .select("id, category_id, name, slug, sku, short_description, description, unit, moq, pack_size, pack_label, availability, weight_kg, main_image_url, categories!inner(slug, is_active)")
     .eq("is_active", true);
 
   if (filters.categorySlug) {
@@ -81,7 +85,7 @@ export async function fetchProducts(filters: ProductFilters = {}): Promise<Produ
 export async function fetchProductBySlug(slug: string): Promise<{ product: Product; images: ProductImage[] } | null> {
   const { data: product, error } = await supabase
     .from("products")
-    .select("id, category_id, name, slug, sku, short_description, description, unit, moq, pack_size, weight_kg, main_image_url")
+    .select("id, category_id, name, slug, sku, short_description, description, unit, moq, pack_size, pack_label, availability, weight_kg, main_image_url")
     .eq("slug", slug)
     .eq("is_active", true)
     .maybeSingle();
