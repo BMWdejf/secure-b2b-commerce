@@ -27,10 +27,11 @@ export default function AdminOrderDetail() {
   const [internalNote, setInternalNote] = useState("");
   const [noteLoaded, setNoteLoaded] = useState(false);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, error } = useQuery({
     queryKey: ["admin-order", id],
     queryFn: () => fetchOrderDetail(id),
     enabled: !!id,
+    retry: 1,
   });
 
   if (data && !noteLoaded) {
@@ -83,6 +84,7 @@ export default function AdminOrderDetail() {
   }
 
   if (isLoading) return <p className="text-muted-foreground">Načítám…</p>;
+  if (error) return <p className="text-destructive">Objednávku se nepodařilo načíst: {(error as any).message}</p>;
   if (!data) return <p>Objednávka nebyla nalezena.</p>;
 
   return (

@@ -40,33 +40,52 @@ export default function ResetPassword() {
   useEffect(() => {
     let cancelled = false;
     let resolved = false;
+    let pollTimer: number | null = null;
+    let giveUpTimer: number | null = null;
 
-    const markReady = () => {
-      if (cancelled || resolved) return;
-      resolved = true;
-      setHasSession(true);
-      // Vyčisti URL od recovery tokenů
+    const cleanUrl = () => {
       if (window.location.search || window.location.hash) {
         window.history.replaceState({}, "", "/reset-password");
       }
     };
 
-    // Posluchač – Supabase při zachycení recovery tokenu z URL emituje PASSWORD_RECOVERY
+    const markReady = () => {
+      if (cancelled || resolved) return;
+      resolved = true;
+      if (pollTimer) window.clearInterval(pollTimer);
+      if (giveUpTimer) window.clearTimeout(giveUpTimer);
+      setHasSession(true);
+      cleanUrl();
+    };
+
+    // 1) Listener na změnu auth stavu — Supabase při zachycení recovery
+    //    tokenu z URL (hash i query) emituje PASSWORD_RECOVERY nebo SIGNED_IN.
     const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === "PASSWORD_RECOVERY" || (session && (event === "SIGNED_IN" || event === "INITIAL_SESSION" || event === "TOKEN_REFRESHED"))) {
+      if (
+        event === "PASSWORD_RECOVERY" ||
+        (session && (event === "SIGNED_IN" || event === "INITIAL_SESSION" || event === "TOKEN_REFRESHED" || event === "USER_UPDATED"))
+      ) {
         markReady();
       }
     });
 
-    // Nejdřív se podívej, jestli už session existuje
-    void supabase.auth.getSession().then(({ data }) => {
-      if (data.session) markReady();
-    });
+    // 2) Pokus o získání session ihned + opakovaný polling (Supabase
+    //    klient dělá detectSessionInUrl asynchronně).
+    const tryGetSession = async () => {
+      if (cancelled || resolved) return;
+      const { data } = await supabase.auth.getSession();
+      if (data.session) {
+        markReady();
+      }
+    };
 
-    // Fallback: pokud po 1500 ms není session ani PASSWORD_RECOVERY,
-    // zkus token z URL ručně (starší linky / token_hash)
-    const fallbackTimer = window.setTimeout(async () => {
-      if (resolved || cancelled) return;
+    void tryGetSession();
+    pollTimer = window.setInterval(tryGetSession, 300);
+
+    // 3) Pokud klient session nenastaví automaticky, zkus ručně
+    //    vyměnit token z URL (starší linky / token_hash / access_token).
+    const manualExchange = async () => {
+      if (cancelled || resolved) return;
 
       const url = new URL(window.location.href);
       const code = url.searchParams.get("code");
@@ -76,39 +95,43 @@ export default function ResetPassword() {
       const at = hash.get("access_token");
       const rt = hash.get("refresh_token");
 
-      let ok = false;
-
-      if (code) {
-        const { error } = await supabase.auth.exchangeCodeForSession(code);
-        if (!error) ok = true;
-      } else if (tokenHash && (type === "recovery" || !type)) {
-        const { error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type: "recovery" });
-        if (!error) ok = true;
-      } else if (at && rt) {
-        const { error } = await supabase.auth.setSession({ access_token: at, refresh_token: rt });
-        if (!error) ok = true;
+      try {
+        if (at && rt) {
+          await supabase.auth.setSession({ access_token: at, refresh_token: rt });
+        } else if (tokenHash) {
+          await supabase.auth.verifyOtp({ token_hash: tokenHash, type: (type as any) || "recovery" });
+        } else if (code) {
+          await supabase.auth.exchangeCodeForSession(code);
+        }
+      } catch {
+        // ignoruj, výsledek dořeší polling/listener
       }
+      void tryGetSession();
+    };
 
-      if (ok) {
-        markReady();
-        return;
-      }
+    // Po 800 ms zkus ruční výměnu (dej Supabase klientovi šanci to udělat sám)
+    const manualTimer = window.setTimeout(manualExchange, 800);
 
-      // Zkontroluj ještě jednou session (mohl ji nastavit listener mezitím)
-      const { data } = await supabase.auth.getSession();
-      if (data.session) {
-        markReady();
-        return;
-      }
-
-      if (!cancelled && !resolved) {
-        setHasSession(false);
-      }
-    }, 1500);
+    // Definitivní timeout — až po 8 sekundách rozhodneme, že odkaz neplatí
+    giveUpTimer = window.setTimeout(() => {
+      if (cancelled || resolved) return;
+      // Poslední pokus: getSession
+      void supabase.auth.getSession().then(({ data }) => {
+        if (cancelled || resolved) return;
+        if (data.session) {
+          markReady();
+        } else {
+          if (pollTimer) window.clearInterval(pollTimer);
+          setHasSession(false);
+        }
+      });
+    }, 8000);
 
     return () => {
       cancelled = true;
-      window.clearTimeout(fallbackTimer);
+      if (pollTimer) window.clearInterval(pollTimer);
+      window.clearTimeout(manualTimer);
+      if (giveUpTimer) window.clearTimeout(giveUpTimer);
       sub.subscription.unsubscribe();
     };
   }, []);
