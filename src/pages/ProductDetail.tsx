@@ -140,7 +140,7 @@ export default function ProductDetail() {
             )}
           </div>
 
-          <PriceGate />
+          <PriceGate productId={product.id} unit={product.unit} />
 
           <Card className="grid grid-cols-3 gap-4 p-5">
             <Spec label="Jednotka" value={product.unit} />

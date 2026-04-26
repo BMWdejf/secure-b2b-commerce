@@ -39,69 +39,76 @@ export default function ResetPassword() {
 
   useEffect(() => {
     let cancelled = false;
+    let resolved = false;
 
-    const tryEstablish = async () => {
-      // 1. Try existing session
-      const { data: existing } = await supabase.auth.getSession();
-      if (existing.session) {
-        if (!cancelled) setHasSession(true);
-        return;
+    const markReady = () => {
+      if (cancelled || resolved) return;
+      resolved = true;
+      setHasSession(true);
+      // Vyčisti URL od recovery tokenů
+      if (window.location.search || window.location.hash) {
+        window.history.replaceState({}, "", "/reset-password");
       }
+    };
 
-      // 2. PKCE code in query
+    // Posluchač – Supabase při zachycení recovery tokenu z URL emituje PASSWORD_RECOVERY
+    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "PASSWORD_RECOVERY" || (session && (event === "SIGNED_IN" || event === "INITIAL_SESSION" || event === "TOKEN_REFRESHED"))) {
+        markReady();
+      }
+    });
+
+    // Nejdřív se podívej, jestli už session existuje
+    void supabase.auth.getSession().then(({ data }) => {
+      if (data.session) markReady();
+    });
+
+    // Fallback: pokud po 1500 ms není session ani PASSWORD_RECOVERY,
+    // zkus token z URL ručně (starší linky / token_hash)
+    const fallbackTimer = window.setTimeout(async () => {
+      if (resolved || cancelled) return;
+
       const url = new URL(window.location.href);
       const code = url.searchParams.get("code");
-      if (code) {
-        const { error } = await supabase.auth.exchangeCodeForSession(code);
-        if (!cancelled) {
-          if (!error) {
-            setHasSession(true);
-            window.history.replaceState({}, "", "/reset-password");
-            return;
-          }
-        }
-      }
-
-      // 3. token_hash (recovery)
       const tokenHash = url.searchParams.get("token_hash");
       const type = url.searchParams.get("type");
-      if (tokenHash && (type === "recovery" || !type)) {
-        const { error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type: "recovery" });
-        if (!cancelled) {
-          if (!error) {
-            setHasSession(true);
-            window.history.replaceState({}, "", "/reset-password");
-            return;
-          }
-        }
-      }
-
-      // 4. Hash (#access_token)
       const hash = new URLSearchParams(window.location.hash.replace(/^#/, ""));
       const at = hash.get("access_token");
       const rt = hash.get("refresh_token");
-      if (at && rt) {
+
+      let ok = false;
+
+      if (code) {
+        const { error } = await supabase.auth.exchangeCodeForSession(code);
+        if (!error) ok = true;
+      } else if (tokenHash && (type === "recovery" || !type)) {
+        const { error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type: "recovery" });
+        if (!error) ok = true;
+      } else if (at && rt) {
         const { error } = await supabase.auth.setSession({ access_token: at, refresh_token: rt });
-        if (!cancelled) {
-          if (!error) {
-            setHasSession(true);
-            window.history.replaceState({}, "", "/reset-password");
-            return;
-          }
-        }
+        if (!error) ok = true;
       }
 
-      if (!cancelled) setHasSession(false);
-    };
+      if (ok) {
+        markReady();
+        return;
+      }
 
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session && !cancelled) setHasSession(true);
-    });
+      // Zkontroluj ještě jednou session (mohl ji nastavit listener mezitím)
+      const { data } = await supabase.auth.getSession();
+      if (data.session) {
+        markReady();
+        return;
+      }
 
-    void tryEstablish();
+      if (!cancelled && !resolved) {
+        setHasSession(false);
+      }
+    }, 1500);
 
     return () => {
       cancelled = true;
+      window.clearTimeout(fallbackTimer);
       sub.subscription.unsubscribe();
     };
   }, []);
