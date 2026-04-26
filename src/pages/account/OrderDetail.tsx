@@ -10,7 +10,12 @@ import { toast } from "sonner";
 
 export default function OrderDetail() {
   const { id = "" } = useParams();
-  const { data, isLoading } = useQuery({ queryKey: ["order", id], queryFn: () => fetchOrderDetail(id), enabled: !!id });
+  const { data, isLoading, error } = useQuery({
+    queryKey: ["order", id],
+    queryFn: () => fetchOrderDetail(id),
+    enabled: !!id,
+    retry: 1,
+  });
 
   async function downloadInvoice() {
     if (!data?.invoice_url) return;
@@ -23,6 +28,7 @@ export default function OrderDetail() {
   }
 
   if (isLoading) return <div className="container py-12 text-muted-foreground">Načítám…</div>;
+  if (error) return <div className="container py-12 text-destructive">Objednávku se nepodařilo načíst: {(error as any).message}</div>;
   if (!data) return <div className="container py-12">Objednávka nebyla nalezena.</div>;
 
   return (
