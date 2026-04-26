@@ -63,21 +63,37 @@ export async function fetchMyOrders(): Promise<OrderRow[]> {
 }
 
 export async function fetchOrderDetail(id: string): Promise<OrderDetail | null> {
+  // Načti objednávku BEZ embedu (ten může selhávat kvůli cache schématu)
   const { data: order, error } = await supabase
     .from("orders")
-    .select("id, order_number, status, currency, subtotal, shipping, vat, total, created_at, customer_note, internal_note, billing_address, shipping_address, invoice_url, company_id, company:companies(name)")
+    .select(
+      "id, order_number, status, currency, subtotal, shipping, vat, total, created_at, customer_note, internal_note, billing_address, shipping_address, invoice_url, company_id",
+    )
     .eq("id", id)
     .maybeSingle();
   if (error) throw error;
   if (!order) return null;
 
-  const { data: items, error: e2 } = await supabase
-    .from("order_items")
-    .select("id, product_id, product_name, product_sku, unit, qty, unit_price, line_total")
-    .eq("order_id", id);
-  if (e2) throw e2;
+  const orderRow = order as any;
 
-  return { ...(order as any), items: items ?? [] } as OrderDetail;
+  // Firma a položky paralelně, samostatně
+  const [companyRes, itemsRes] = await Promise.all([
+    orderRow.company_id
+      ? supabase.from("companies").select("name").eq("id", orderRow.company_id).maybeSingle()
+      : Promise.resolve({ data: null, error: null } as any),
+    supabase
+      .from("order_items")
+      .select("id, product_id, product_name, product_sku, unit, qty, unit_price, line_total")
+      .eq("order_id", id),
+  ]);
+
+  if (itemsRes.error) throw itemsRes.error;
+
+  return {
+    ...orderRow,
+    company: companyRes?.data ? { name: (companyRes.data as any).name } : null,
+    items: itemsRes.data ?? [],
+  } as OrderDetail;
 }
 
 export interface CreateOrderInput {

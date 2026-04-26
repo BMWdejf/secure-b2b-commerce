@@ -7,7 +7,7 @@ export async function adminListOrders(filter?: {
 }): Promise<OrderRow[]> {
   let q = supabase
     .from("orders")
-    .select("id, order_number, status, currency, subtotal, shipping, vat, total, created_at, company_id, company:companies(name)")
+    .select("id, order_number, status, currency, subtotal, shipping, vat, total, created_at, company_id")
     .order("created_at", { ascending: false })
     .limit(500);
   if (filter?.status) q = q.eq("status", filter.status);
@@ -16,7 +16,17 @@ export async function adminListOrders(filter?: {
   }
   const { data, error } = await q;
   if (error) throw error;
-  return (data ?? []) as unknown as OrderRow[];
+  const rows = (data ?? []) as any[];
+  const companyIds = Array.from(new Set(rows.map((r) => r.company_id).filter(Boolean)));
+  let companies: Record<string, { name: string }> = {};
+  if (companyIds.length > 0) {
+    const { data: cs } = await supabase
+      .from("companies")
+      .select("id, name")
+      .in("id", companyIds);
+    for (const c of cs ?? []) companies[(c as any).id] = { name: (c as any).name };
+  }
+  return rows.map((r) => ({ ...r, company: companies[r.company_id] ?? null })) as OrderRow[];
 }
 
 export async function adminUpdateOrderStatus(id: string, status: OrderStatus) {
