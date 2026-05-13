@@ -1,29 +1,96 @@
-Plán opravy
+## Import produktů přes POST request
 
-1. Opravit objednávky a detail objednávky
-- Chyba není v samotném vytvoření objednávky: objednávka `209afbe0-712e-4fce-89e4-6120098369bd` v databázi existuje a má 1 položku.
-- Skutečný problém je v načítání detailu/seznamu pro admin: dotaz se pokouší připojit firmu přes vztah `orders -> companies`, který v databázovém schématu není správně definovaný. Backend proto vrací chybu `Could not find a relationship between 'orders' and 'companies'`, a aplikace to nyní mylně zobrazí jako „Objednávka nebyla nalezena“.
-- Doplním databázovou vazbu `orders.company_id -> companies.id`, aby objednávky šly správně spojit s firmou.
-- Současně upravím načítání objednávek tak, aby detail objednávky nebyl závislý jen na tomto automatickém spojení: objednávka se načte samostatně a firma/položky samostatně. Tím bude detail fungovat i kdyby se cache schématu backendu opozdila.
-- V klientském i admin detailu začnu rozlišovat skutečný stav „nenalezeno“ od technické chyby načtení, aby se už nezobrazovala zavádějící hláška.
+Máš dvě hlavní možnosti, jak hromadně importovat produkty do databáze pomocí POST requestu. Doporučuji **variantu A** (Edge Function), protože je bezpečnější a poskytuje validaci.
 
-2. Opravit reset hesla
-- Resetovací odkaz je jednorázový a při přesměrování se token/session může zpracovat dřív, než se stránka `/reset-password` stihne inicializovat. Výsledkem je falešná hláška „odkaz je neplatný nebo vypršel“.
-- Nastavím odesílání resetovacího odkazu přes bezpečný callback `/auth/callback?next=/reset-password`, který recovery session zachytí a uloží stav pro stránku resetu.
-- Upravím `/auth/callback`, aby aktivně počkal na recovery session/token a až poté přesměroval na `/reset-password`.
-- Upravím `/reset-password`, aby používala uložený recovery stav i aktuální session, nevyhodnotila odkaz jako neplatný předčasně a tlačítko „Nastavit nové heslo“ bylo aktivní hned po splnění validace hesla.
-- Po úspěšném uložení hesla se recovery stav vyčistí, uživatel se odhlásí a bude přesměrován na přihlášení.
+---
 
-3. Ověření po opravě
-- Ověřím, že objednávka `209afbe0-712e-4fce-89e4-6120098369bd` jde načíst v klientském detailu i v admin panelu.
-- Ověřím, že admin seznam objednávek znovu vrací položky.
-- Ověřím reset hesla na novém resetovacím odkazu. Staré resetovací odkazy nelze spolehlivě znovu použít, protože jsou jednorázové.
+### Varianta A (doporučená): Vlastní Edge Function `import-products`
 
-Technické detaily
-- Databázová migrace: doplnění chybějící foreign key vazby pro `orders.company_id`.
-- Úpravy souborů: `src/lib/api/orders.ts`, `src/lib/api/adminOrders.ts`, `src/pages/account/OrderDetail.tsx`, `src/pages/admin/AdminOrderDetail.tsx`, `src/pages/ForgotPassword.tsx`, `src/pages/AuthCallback.tsx`, `src/pages/ResetPassword.tsx`.
-- Nezasáhnu do automaticky generovaných backend typů ani klienta.
+Vytvořím serverovou funkci, na kterou pošleš POST request s polem produktů. Funkce ověří API klíč, validuje data a vloží produkty do databáze pomocí service role (obejde RLS, ale jen pro autorizované volání).
 
-<lov-actions>
-<lov-link url="https://docs.lovable.dev/tips-tricks/troubleshooting">Troubleshooting docs</lov-link>
-</lov-actions>
+**Endpoint:**
+```
+POST https://ybywzhzbvfkwcngscqwb.supabase.co/functions/v1/import-products
+```
+
+**Hlavičky:**
+```
+Content-Type: application/json
+x-import-key: <tajný klíč, který si nastavíš v Lovable Cloud>
+```
+
+**Tělo (příklad):**
+```json
+{
+  "products": [
+    {
+      "name": "Vzor 2076 Ranforce",
+      "slug": "vzor-2076-ranforce",
+      "sku": "RAN-2076",
+      "category_slug": "ranforce",
+      "short_description": "Bavlněná tkanina ranforce",
+      "description": "Detailní popis…",
+      "unit": "m",
+      "moq": 30,
+      "pack_size": 30,
+      "pack_label": "Karton",
+      "availability": "in_stock",
+      "weight_kg": 0.18,
+      "main_image_url": "https://…/image.jpg",
+      "is_active": true,
+      "images": [
+        { "url": "https://…/1.jpg", "is_primary": true, "sort_order": 0 }
+      ],
+      "prices": [
+        { "pricelist_name": "Standard", "min_qty": 1, "unit_price": 129 },
+        { "pricelist_name": "Standard", "min_qty: 100, "unit_price": 119 }
+      ]
+    }
+  ]
+}
+```
+
+**Co funkce udělá:**
+- Ověří `x-import-key` proti tajnému klíči (Lovable Cloud secret `IMPORT_API_KEY`).
+- Pro každý produkt:
+  - Najde `category_id` podle `category_slug` (volitelné).
+  - Vloží/aktualizuje produkt podle `slug` (upsert).
+  - Vloží volitelné obrázky do `product_images`.
+  - Vloží volitelné ceny do `pricelist_items` (ceník dohledá podle `pricelist_name`).
+- Vrátí JSON se souhrnem: počet vložených, aktualizovaných, chybných položek + chyby.
+
+**Výhody:**
+- Tajný klíč chrání endpoint.
+- Vstupy se validují.
+- Atomické zpracování po dávkách.
+- Funguje z jakéhokoli skriptu (curl, Postman, Python, n8n…).
+
+---
+
+### Varianta B: Přímé volání Supabase REST API (PostgREST)
+
+Bez vytváření vlastní funkce můžeš volat:
+```
+POST https://ybywzhzbvfkwcngscqwb.supabase.co/rest/v1/products
+apikey: <service_role_key>
+Authorization: Bearer <service_role_key>
+Content-Type: application/json
+Prefer: resolution=merge-duplicates
+```
+
+**Tělo:** přímo pole řádků odpovídající sloupcům tabulky `products`.
+
+**Nevýhody:**
+- Musíš mít po ruce **service role key** (nesmí jít do prohlížeče ani do veřejného repa).
+- Žádná validace ani normalizace (kategorie podle slugu, ceny, obrázky musíš řešit zvlášť dalšími voláními).
+- RLS by jinak insert blokovalo (anon klíč nevloží), takže service role je nutný.
+
+---
+
+### Co potřebuji od tebe rozhodnout
+
+1. Zvolit variantu (doporučuji **A**).
+2. Pokud A: schválit přidání tajného klíče `IMPORT_API_KEY` do Lovable Cloud (vyžádám si ho přes secret prompt).
+3. Potvrdit strukturu vstupního JSON (zda chceš zahrnout i `images` a `prices`, nebo jen základní pole produktu).
+
+Po schválení tohoto plánu funkci vytvořím a pošlu ti ukázku `curl` volání pro otestování.
