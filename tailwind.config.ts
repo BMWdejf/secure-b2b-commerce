@@ -73,6 +73,12 @@ export default {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
+        cream: { DEFAULT: "hsl(var(--cream))", deep: "hsl(var(--cream-deep))" },
+        ink: { DEFAULT: "hsl(var(--ink))", soft: "hsl(var(--ink-soft))" },
+        rose: { DEFAULT: "hsl(var(--rose))", soft: "hsl(var(--rose-soft))" },
+        terracotta: "hsl(var(--terracotta))",
+        olive: "hsl(var(--olive))",
+        line: "hsl(var(--line))",
       },
       borderRadius: {
         lg: "var(--radius)",
