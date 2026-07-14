@@ -73,6 +73,17 @@
     --sidebar-accent-foreground: 210 40% 98%;
     --sidebar-border: 218 45% 28%;
     --sidebar-ring: 35 95% 55%;
+
+    /* ---- Warm editorial palette (takoy-inspired) ---- */
+    --cream: 46 60% 93%;
+    --cream-deep: 40 45% 86%;
+    --ink: 40 15% 10%;
+    --ink-soft: 30 10% 28%;
+    --rose: 351 40% 62%;
+    --rose-soft: 351 55% 88%;
+    --terracotta: 12 55% 47%;
+    --olive: 82 15% 51%;
+    --line: 35 20% 78%;
   }
 
   .dark {
